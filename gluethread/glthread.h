@@ -20,7 +20,7 @@
 #ifndef __GLUETHREAD__
 #define __GLUETHREAD__
 
-typdef struct _glthread{
+typedef struct _glthread{
     struct _glthread *left; //pointer to the before node
     struct _glthread *right; //pointer to the next node
 
@@ -48,25 +48,29 @@ void delete_glthread_list(glthread_t *base_glthread);
 unsigned int glthread_list_count(glthread_t *base_glthread);
 
 //macro functions
-#define BASE(glthreadptr)   ((glthreadptr->right)
-#define ITERATE_GLTHREAD_BEGIN(glthreadptrstart,glthreadptr)            \
-{                                                                       \
-    glthread_t *glthreadptr = NULL;                                     \
-    glthreadptr = BASE(glthreadptrstart);                               \
-    for(;glthreadptr!=NULL;glthreadptr= _glthread_ptr){                 \
-        _glthread_ptr = _glthread_ptr->right;                           
+
+
+#define GLTHREAD_TO_STRUCT(fn_name, structure_name, field_name)                        \
+    static inline structure_name * fn_name(glthread_t *glthreadptr){                   \
+        return (structure_name *)((char *)(glthreadptr) - (char *)&(((structure_name *)0)->field_name)); \
+    }
+
+
+#define BASE(glthreadptr)   ((glthreadptr)->right)
+
+#define ITERATE_GLTHREAD_BEGIN(glthreadptrstart, glthreadptr)                                      \
+{                                                                                                  \
+    glthread_t *_glthread_ptr = NULL;                                                              \
+    glthreadptr = BASE(glthreadptrstart);                                                          \
+    for(; glthreadptr!= NULL; glthreadptr = _glthread_ptr){                                        \
+        _glthread_ptr = (glthreadptr)->right;
+
+#define ITERATE_GLTHREAD_END(glthreadptrstart, glthreadptr)                                        \
+        }}
+
+#define GLTHREAD_GET_USER_DATA_FROM_OFFSET(glthreadptr, offset)  \
+    (void *)((char *)(glthreadptr) - offset)
+
     
-#define ITERATE_GLTHREAD_END(glthreadptrstart,glthreadptr)              \    
-   }}
 
-
-#define GLTHREAD_GET_USR_DATA_FROM_OFFSET(glthreadptr,offset)           \
-    (void *)((char *)glthreadptr-offset)
-
-#define IS_GLTHREAD_LIST_EMPTY(glthreadptr)                             \
-    ((glthreadptr)->right ==0 && (glthread)->left == 0)
-
-
-
-
-
+#endif

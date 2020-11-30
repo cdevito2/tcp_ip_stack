@@ -50,7 +50,7 @@ void glthread_add_before(glthread_t *curr_glthread, glthread_t *new_glthread){
         //new node will be first node in the list
         curr_glthread->left = new_glthread;
         new_glthread->right = curr_glthread;
-        new_gltthread->left = NULL;
+        new_glthread->left = NULL;
         return;
     }
     //current node already has a previous node so we have to insert
@@ -77,11 +77,8 @@ void remove_glthread(glthread_t *curr_glthread){
 
     if(!curr_glthread->right){
         //either at end of list or its the only element in the list
-        if(curr_glthread->left){
-            curr_glthread->left->right = NULL;
-            curr_glthread->left->right = NULL;
-            return;
-        }
+        curr_glthread->left->right = NULL;
+        curr_glthread->left->right = NULL;
         return;
     }
 
@@ -127,19 +124,13 @@ unsigned int glthread_list_count(glthread_t *base_glthread){
     //iterate through all elements in the list and increment the count
     //then return it
     unsigned int count = 0;
-    glthread_t *glthread_ptr = NULL;
-    ITERATE_GLTHREAD_BEGIN(base_glthread,glthread_ptr){
+    glthread_t *glthreadptr = NULL;
+    ITERATE_GLTHREAD_BEGIN(base_glthread,glthreadptr){
         count++;
-    }ITERAGE_GLTHREAD_END;
+    }ITERATE_GLTHREAD_END(base_glthread,glthreadptr);
 
     return count;
 
 }
-
-
-
-
-
-
 
 
