@@ -42,6 +42,10 @@ node_t * create_graph_node(graph_t *graph, char *node_name){
     //copy node_name in parameter to the struct field
     strncpy(node->node_name,node_name,NODE_NAME_SIZE);
     node->node_name[NODE_NAME_SIZE]='\0';
+    //initialize node networking info
+
+    init_node_nw_prop(&node->node_nw_prop);
+
     //add the glthread node to the linked list
     glthread_add_next(&graph->node_list,&node->graph_glue);
     return node;
@@ -68,6 +72,11 @@ void insert_link_between_two_nodes(node_t *node1,
 
     link->intf1.att_node = node1;
     link->intf2.att_node = node2;
+    //initialize interface properties
+    init_intf_nw_prop(&link->intf1.intf_nw_props);
+    init_intf_nw_prop(&link->intf2.intf_nw_props);
+    interface_assign_mac_address(&link->intf1);
+    interface_assign_mac_address(&link->intf2);
     link->cost = cost;
     int index_empty_interface_slot;
 
@@ -76,7 +85,7 @@ void insert_link_between_two_nodes(node_t *node1,
     node1->intf[index_empty_interface_slot] = &link->intf1;
 
     //do the samefor node2
-    
+     
     index_empty_interface_slot = get_node_intf_available_slot(node2);
     node2->intf[index_empty_interface_slot] = &link->intf2;
 

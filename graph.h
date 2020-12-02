@@ -20,6 +20,7 @@
 #define __GRAPH__
 
 #include "gluethread/glthread.h" 
+#include "net.h"
 #include <assert.h>
 #include <stddef.h>
      
@@ -51,6 +52,7 @@ typedef struct interface_{
     struct node_ *att_node; //pointer to the owning node of the interface
     struct link_ *link; //pointer to the link for the interface
 
+    intf_nw_props_t intf_nw_props;//struct to hold networking properties for interface
 } interface_t;
 
 typedef struct link_{
@@ -63,6 +65,8 @@ struct node_{
     char node_name[NODE_NAME_SIZE];
     interface_t *intf[MAX_INTF_PER_NODE];
     glthread_t graph_glue; //used in order to insert into struct graph linked list
+    node_nw_prop_t node_nw_prop; //struct to hold networking properties
+
 };
 
 
