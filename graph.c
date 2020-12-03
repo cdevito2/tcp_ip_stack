@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
+#include <memory.h>
 
 
 graph_t * create_new_graph(char *topology_name){

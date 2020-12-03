@@ -4,7 +4,8 @@ TARGET=test.exe
 
 OBJS=gluethread/glthread.o\
 		  graph.o\
-		  topologies.o
+		  topologies.o\
+		  net.o
 
 test.exe:testapp.o ${OBJS}
 	${CC} ${CFLAGS} testapp.o ${OBJS} -o test.exe
