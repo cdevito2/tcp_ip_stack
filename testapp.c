@@ -17,11 +17,16 @@
  */
 #include "graph.h"
 #include <stdio.h>
+#include "CommandParser/libcli.h"
 extern graph_t *build_first_topo();
+extern void nw_init_cli();
+//define global variable
+graph_t *topo = NULL;
 
 int 
 main(int argc, char **argv){
-    graph_t *topo = build_first_topo();
-    dump_nw_graph(topo);
+    nw_init_cli();
+    topo = build_first_topo();
+    start_shell();//this call starts the libcli library
     return 0;
 }
