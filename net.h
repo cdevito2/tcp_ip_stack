@@ -79,6 +79,9 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 //functions to define in net.c
+interface_t * node_get_matching_subnet_interface(node_t *node, char *ip_addr);
+void convert_ip_from_int_to_str(unsigned int ip_addr, char *output_buffer);
+unsigned int convert_ip_from_str_to_int(char *str_ip_address);
 bool_t node_set_loopback_address(node_t *node, char *ip_addr);
 bool_t node_set_intf_ip_address(node_t *node, char *local_if, char *ip_addr, char mask);
 bool_t node_unset_intf_ip_address(node_t *node, char *local_if);
