@@ -66,7 +66,8 @@ struct node_{
     interface_t *intf[MAX_INTF_PER_NODE];
     glthread_t graph_glue; //used in order to insert into struct graph linked list
     node_nw_prop_t node_nw_prop; //struct to hold networking properties
-
+    unsigned int udp_port_number;
+    int udp_sock_fd;
 };
 
 

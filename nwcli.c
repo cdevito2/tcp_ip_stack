@@ -45,6 +45,14 @@ static int show_nw_topology_handler(param_t *param, ser_buff_t *tlv_buff, op_mod
     }
 }
 
+//handler for run node resolve arp 
+static int arp_handler(param_t *param, ser_buff_t *tlv_buff, op_mode enable_or_disable){
+    node_t *node;
+    char *node_name;
+
+
+
+}
 void nw_init_cli(){
     //init command line library
     init_libcli();

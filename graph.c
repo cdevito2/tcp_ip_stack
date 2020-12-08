@@ -42,6 +42,9 @@ node_t * create_graph_node(graph_t *graph, char *node_name){
     //copy node_name in parameter to the struct field
     strncpy(node->node_name,node_name,NODE_NAME_SIZE);
     node->node_name[NODE_NAME_SIZE]='\0';
+   
+   //assign port number and socket to node on creation
+    init_udp_socket(node);
     //initialize node networking info
 
     init_node_nw_prop(&node->node_nw_prop);
