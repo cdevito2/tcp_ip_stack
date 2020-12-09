@@ -8,7 +8,8 @@ OBJS=gluethread/glthread.o\
 		  graph.o\
 		  topologies.o\
 		  net.o\
-		  nwcli.o
+		  nwcli.o\
+		  comm.o
 
 test.exe:testapp.o ${OBJS} CommandParser/libcli.a
 	${CC} ${CFLAGS} testapp.o ${OBJS} -o test.exe ${LIBS}
@@ -25,7 +26,9 @@ topologies.o:topologies.c
 net.o:net.c
 	${CC} ${CFLAGS} -c -I . net.c -o net.o
 nwcli.o:nwcli.c
-	${CC} ${CFLAGS} -c -I  . nwcli.c -o nwcli.o
+	${CC} ${CFLAGS} -c -I . nwcli.c -o nwcli.o
+comm.o:comm.c
+	${CC} ${CFLAGS} -c -I . comm.c  -o comm.o 
 CommandParser/libcli.a:
 	(cd CommandParser; make)
 clean:
