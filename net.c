@@ -34,8 +34,9 @@ void interface_assign_mac_address(interface_t *interface){
 bool_t node_set_loopback_address(node_t *node, char *ip_addr){
     node->node_nw_prop.is_lb_addr_config = TRUE;
     //assign ip
+
     strncpy(NODE_LO_ADDR(node),ip_addr,16);
-    NODE_LO_ADDR(node)[16] = '\0';
+    NODE_LO_ADDR(node)[15] = '\0';
     return TRUE;
 }
 
@@ -107,7 +108,8 @@ unsigned int convert_ip_from_str_to_int(char *str_ip_addr){
 
 
 void dump_node_nw_props(node_t *node){
-    printf("\nNode Name = %s\n", node->node_name);
+    
+    printf("\nNode Name = %s, udp_port_no = %u\n", node->node_name, node->udp_port_number);
     if(node->node_nw_prop.is_lb_addr_config){
         printf("\t lo addr: %s/32\n",NODE_LO_ADDR(node));
     }
@@ -136,6 +138,7 @@ void dump_nw_graph(graph_t *graph){
     printf("Topology Name = %s\n",graph->topology_name);
     unsigned int i;
     ITERATE_GLTHREAD_BEGIN(&graph->node_list,curr){
+        printf("%u\n",node->udp_port_number);
         node = graph_glue_to_node(curr);
         dump_node_nw_props(node);
         for (i=0;i<MAX_INTF_PER_NODE;i++){

@@ -34,6 +34,23 @@ static char send_buffer[MAX_PACKET_BUFFER_SIZE];
 static char recv_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
 static unsigned int udp_port_number = 40000;
 
+static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, unsigned int dst_udp_port_no){
+    //need to create sockaddr struct and invoke sendto
+    int rc;
+    struct sockaddr_in dest_addr;
+    //define the destination for this packet
+    dest_addr.sin_family = AF_INET;//ipv4
+    dest_addr.sin_port = dst_udp_port_no;
+    struct hostent *host = (struct hostent *)gethostbyname("127.0.0.1");
+    dest_addr.sin_addr = *((struct in_addr *)host->h_addr);
+    printf("PORT : %d\n",dest_addr.sin_port);
+    //now we have defined the dest address now send, note function that calls this function has opened a socket already
+    rc = sendto(sock_fd,pkt_data,pkt_size,0,(struct sockaddr *)&dest_addr, sizeof(struct sockaddr));
+    return rc;
+
+
+}
+
 //this is internal function hence i made it static
 static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsigned int pkt_size){
     //segregate interface name from rest of data
@@ -56,6 +73,7 @@ static unsigned int get_next_udp_port(){
 int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //entry point into link layer
     //ingress journey of packet starts from here in the TCP IP stack
+    printf("msg recvd = %s, on node = %s,  IIF= %s\n",pkt, node->node_name, interface->if_name);
     return 0;
     //will add logic later
 }
@@ -70,16 +88,17 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
 
     //get destination port number
     unsigned int dest_udp_port = nbr_node->udp_port_number;
+    //unsigned int dest_udp_port = 40001;
     //create socket so you can send data
-    int sock = sock(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+    int sock = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
     //error check ensure socket created
     if(sock<0){
-        fprintf("Error: socket creation failed, errno = %d",errno);
+        printf("Error: socket creation failed, errno = %d",errno);
         return -1;
     }
 
     //get receiving interface
-    interface_t *recv_interface = &interface->link->intf1 == interface ? \ &interface->link->intf2 : &interface->link->intf1;
+    interface_t *recv_interface = &interface->link->intf1 == interface ?  &interface->link->intf2 : &interface->link->intf1;
 
     //initialize buffer to send data
     memset(send_buffer,0,MAX_PACKET_BUFFER_SIZE);
@@ -88,7 +107,7 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
     char *pkt_with_aux_data = send_buffer;
     
     //add in receiving interface name
-    strncpy(pkt_with_aux_data, other_interface->if_name, IF_NAME_SIZE);
+    strncpy(pkt_with_aux_data, recv_interface->if_name, IF_NAME_SIZE);
 
     pkt_with_aux_data[IF_NAME_SIZE] = '\0';//escape char
 
@@ -103,29 +122,10 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
 }
 
 
-static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, unsigned int dst_udp_port_no){
-    //need to create sockaddr struct and invoke sendto
-    int rc;
-    struct sockaddr_in dest_addr;
-
-    //define the destination for this packet
-    dest_addr.sin_family = AF_INET;//ipv4
-    dest_addr.sin_port = dst_udp_port_no;
-    struct hostent *host = (struct hostent *)getbyhostname("127.0.0.1");
-    dest_addr.sin_addr = *((struct in_addr *)host->h_addr);
-
-    //now we have defined the dest address now send, note function that calls this function has opened a socket already
-    rc = sendto(sock_fd,pkt_data,pkt_size,0,(struct sockaddr *)&dest_addr, sizeof(struct sockaddr));
-    return rc;
-
-
-}
-
-
 void init_udp_socket(node_t *node){
     //assign udp port number and create socket
     node->udp_port_number = get_next_udp_port();
-
+    printf("UDP PORT FOR NODE IS: %d\n",node->udp_port_number);
     //create socket
 
     int udp_sock_fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
@@ -150,7 +150,6 @@ void init_udp_socket(node_t *node){
 
 static void * _network_start_pkt_receiver_thread(void *arg){
     //iterate over all nodes of topology and using their file descriptors listen on them
-
     node_t *node;
     glthread_t *curr;
     //store all filedescriptors with fdset
@@ -185,7 +184,6 @@ static void * _network_start_pkt_receiver_thread(void *arg){
 
     //start infinite loop and listen all file desriptors
     while(1){
-
         //add all file descriptors to active set
         memcpy(&active_sock_fd_set,&backup_sock_fd_set, sizeof(fd_set));
         //select function call
@@ -193,7 +191,6 @@ static void * _network_start_pkt_receiver_thread(void *arg){
         //this is blocking, so as soon as any data arrives on any FD the code gets executed below
         //if we are here it means 1 or more file descriptors have recv data
         //check which file descriptors have been activated
-
         ITERATE_GLTHREAD_BEGIN(&topo->node_list,curr){
             //iterate through all nodes
             node = graph_glue_to_node(curr);
@@ -211,6 +208,33 @@ static void * _network_start_pkt_receiver_thread(void *arg){
     }
 
 }
+
+
+int send_pkt_flood(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size){
+    //send packet out of all node interfaces except the exempt interface
+    //loop through the node list of interface
+    unsigned int i =0;
+    interface_t *intf;
+    for(i=0;i<MAX_INTF_PER_NODE;i++){
+        intf = node->intf[i];
+        if(!intf){
+            return 0;
+        }
+        
+        if(intf == exempted_intf){
+            continue;
+        }
+
+        //if we make it here for an interface then we want to invoke send packet function
+        send_pkt_out(pkt,pkt_size,intf);
+
+
+
+    }
+}
+
+
+
 void network_start_pkt_receiver_thread(graph_t *topo){
     //invoke thread to monitor file descriptors
     pthread_t recv_pkt_thread;

@@ -48,7 +48,7 @@ node_t * create_graph_node(graph_t *graph, char *node_name){
     //initialize node networking info
 
     init_node_nw_prop(&node->node_nw_prop);
-
+    
     //add the glthread node to the linked list
     glthread_add_next(&graph->node_list,&node->graph_glue);
     return node;
