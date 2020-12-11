@@ -91,4 +91,5 @@ bool_t node_set_intf_ip_address(node_t *node, char *local_if, char *ip_addr, cha
 bool_t node_unset_intf_ip_address(node_t *node, char *local_if);
 void interface_assign_mac_address(interface_t *interface);
 void dump_nw_graph(graph_t *graph);
+char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int total_buffer_size);
 #endif

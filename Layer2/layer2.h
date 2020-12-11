@@ -31,7 +31,7 @@ typedef struct ethernet_hdr_{
     mac_add_t dest_mac; //6 bytes
     char payload[248]; //max 1500 bytes but chose smaller
     unsigned int FCS; //CRC field - frame check sequence
-    short type; //2 bytes
+    unsigned short type; //2 bytes
 }ethernet_hdr_t;
 #pragma pack(pop)
 
@@ -69,7 +69,34 @@ static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_s
 }
 
 
+//static function to decide whether routing device should accept or reject incoming packet
+static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, ethernet_hdr_t *ethernet_hdr){
+    //check if interface IP address has ip address, if not return false straight away
+    //if above passes, check if the interface mac address is equal to the ethernet header dest mac addr, if it is then return true
+    //if the above fails, also check if the dest mac is the broadcast mac, and return true
+    //return false otherwise
 
+    //first check for ip addr
+    if(!IS_INTF_L3_MODE(interface)){
+        return FALSE;
+    }
+    //second check comparing dest mac address to interface mac address
+    //memcmp compares binary byte buffers we we must use this, must compare size of ethernet header mac address bytes to ensure they are a match
+    if(memcmp(IF_MAC(interface),ethernet_hdr->dest_mac.mac,sizeof(mac_add_t) == 0){
+        //if returns 0 they are the same
+        return TRUE;
+    }
+    
+    
+    
+    //third check see if dest mac is broadcast address
+    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dest_mac.mac){
+        return TRUE;
+    }
+
+    return FALSE;
+
+}
 
 
 #endif

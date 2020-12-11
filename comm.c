@@ -30,6 +30,8 @@
 #include <errno.h>
 #include <netdb.h>
 
+
+
 static char send_buffer[MAX_PACKET_BUFFER_SIZE];
 static char recv_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
 static unsigned int udp_port_number = 40000;
@@ -62,6 +64,7 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
     }
 
     //invoke call to receive packet
+    //note that pkt_with_aux_data right+shitfs the packet pointer to the start of data
     pkt_receive(receiving_node,recv_intf,pkt_with_aux_data+IF_NAME_SIZE,pkt_size - IF_NAME_SIZE);
 }
 
@@ -70,12 +73,22 @@ static unsigned int get_next_udp_port(){
     return udp_port_number++;
 }
 
+//import external function from layer2.c 
+extern void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size);
+
 int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //entry point into link layer
     //ingress journey of packet starts from here in the TCP IP stack
     printf("msg recvd = %s, on node = %s,  IIF= %s\n",pkt, node->node_name, interface->if_name);
+    //here we perform a right shift to the packet pointer to the right boundary, right before the pkt data, note previously it was pointing to the beginning of data but we need to add space before it
+    pkt = pkt_buffer_shift_right(pkt,pkt_size, MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE);
+
+    //further processing of packet
+    ///*  THIS FUNCTION IS THE ENTRY POINT INTO THE TCP IP STACK FROM THE BOTTOM! */
+    //note that packet pointer at this point is pointing to the data in the already right shifted packet buffer 
+    layer2_frame_recv(node,interface,pkt,pkt_size);
     return 0;
-    //will add logic later
+    
 }
 
 int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){

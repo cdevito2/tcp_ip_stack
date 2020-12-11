@@ -18,7 +18,7 @@
 #include "net.h"
 #include "graph.h"
 #include <stdio.h>
-#include "utils.c"
+#include "utils.h"
 #include <stdlib.h>
 #include <netinet/in.h>
 
@@ -154,7 +154,30 @@ void dump_nw_graph(graph_t *graph){
 }
 
 
+/*  function that performs right shift of data on a packet buffer and returns pointer to start of data in the right shifted packet buffer */
 
+char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int total_buffer_size){
+    //note that totalbuffersize is MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE
+    char *temp = NULL;
+    bool_t need_temp_memory = FALSE;
+    if(pkt_size *2 > total_buffer_size){
+        need_temp_memory = TRUE;
+    }
+    
+
+    if(need_temp_memory){
+        temp = calloc(1,pkt_size);
+        memcpy(temp,pkt,pkt_size);
+        memset(pkt,0,total_buffer_size);
+
+    }
+
+    
+
+
+
+
+}
 
 
 

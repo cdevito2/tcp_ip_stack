@@ -19,17 +19,8 @@
 #include "utils.h"
 #include <arpa/inet.h>
 #include <sys/socket.h>
-
-void layer2_fill_with_broadcast_mac(char *mac_array){
-    mac_array[0] = 0xFF;
-    mac_array[1] = 0xFF;
-    mac_array[2] = 0xFF;
-    mac_array[3] = 0xFF;
-    mac_array[4] = 0xFF;
-    mac_array[5] = 0xFF;
-}
-
-
+#include <string.h>
+#include <stdint.h>
 
 void apply_mask(char *prefix, char mask, char *str_prefix){
 
@@ -51,4 +42,13 @@ void apply_mask(char *prefix, char mask, char *str_prefix){
     str_prefix[15]='\0';
 
 
+}
+
+void layer2_fill_with_broadcast_mac(char *mac_array){
+    mac_array[0] = 0xFF;
+    mac_array[1] = 0xFF;
+    mac_array[2] = 0xFF;
+    mac_array[3] = 0xFF;
+    mac_array[4] = 0xFF;
+    mac_array[5] = 0xFF;
 }
