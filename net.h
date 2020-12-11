@@ -23,8 +23,8 @@
 typedef struct graph_ graph_t;
 typedef struct node_ node_t;
 typedef struct interface_ interface_t;
-
-
+typedef struct arp_table_ arp_table_t;
+#pragma pack(push,1)
 typedef struct ip_addr_{
     char ip_addr[16]; //maximum of 15 characters
 }ip_addr_t;
@@ -36,14 +36,17 @@ typedef struct mac_addr_{
 typedef struct node_nw_prop_{
     bool_t is_lb_addr_config;//bool to see if loopback configured
     ip_addr_t lb_addr; //loopback address
-
+    arp_table_t *arp_table;
 }node_nw_prop_t;
+#pragma pack(pop)
+extern void init_arp_table(arp_table_t **arp_table);
 
 //function to initia;ize network properties of node
 static inline void init_node_nw_prop(node_nw_prop_t *node_nw_prop){
     /*  default init */
     node_nw_prop->is_lb_addr_config = FALSE;
     memset(node_nw_prop->lb_addr.ip_addr,0,16);
+    init_arp_table(&(node_nw_prop->arp_table));
 
 }
 
@@ -83,6 +86,9 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 //functions to define in net.c
+
+unsigned int ap_addr_p_to_n(char *ip_addr);
+void ip_addr_n_to_p(unsigned int ip_addr, char *ip_addr_str);
 interface_t * node_get_matching_subnet_interface(node_t *node, char *ip_addr);
 void convert_ip_from_int_to_str(unsigned int ip_addr, char *output_buffer);
 unsigned int convert_ip_from_str_to_int(char *str_ip_address);

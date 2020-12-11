@@ -33,6 +33,47 @@ typedef struct ethernet_hdr_{
     unsigned int FCS; //CRC field - frame check sequence
     unsigned short type; //2 bytes
 }ethernet_hdr_t;
+
+
+
+typedef struct arp_hdr_{
+    short hw_type; //1 for ethernet cable
+    short proto_type;//0x8000 for ipv4
+    char hw_addr_len;//6 for mac
+    char proto_addr_len;//4 for ipv4
+    short op_code;//Arp Req or reply
+    mac_add_t src_mac;
+    mac_add_t dest_mac;
+    unsigned int src_ip;
+    unsigned int dest_ip;
+
+}arp_hdr_t;
+
+
+
+typedef struct arp_table_{
+    glthread_t arp_entries;
+}arp_table_t;
+
+
+
+typedef struct arp_entry_ arp_entry_t;
+
+struct apr_entry_{
+    ip_add_t ip_addr;//key for table
+    mac_add_t mac_addr;
+    char oif[IF_NAME_SIZE];
+    bool_t is_sane;
+    glthread_t arp_glue;
+    //for future implementation list of pending packets for arp res
+    glthread_t arp_pending_list;
+};
+GLTHREAD_TO_SRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
+
+
+
+
+
 #pragma pack(pop)
 
 
@@ -97,6 +138,18 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     return FALSE;
 
 }
+
+
+//function to call when node is created during topology creation
+void init_arp_table(arp_table_t **arp_table);
+//CRUD operations on arp table
+bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry);//CREATE
+arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr)://REPLACE
+void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr, interface_t *iif);//UPDATE
+void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
+
+//print arp table
+void dump_arp_table(arp_table_t *arp_table);
 
 
 #endif

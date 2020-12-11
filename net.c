@@ -171,15 +171,24 @@ char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int tot
         memset(pkt,0,total_buffer_size);
 
     }
-
-    
-
-
-
-
 }
 
 
+unsigned int ip_addr_p_to_n(char *ip_addr){
+    unsigned int ip_addr_int;
+    inet_pton(AF_INET,ip_addr,&ip_addr_int);
+    ip_addr_int = htonl(ip_addr_int);
+    return ip_addr_int;
+}
+
+
+void ip_addr_n_to_p(unsigned int ip_addr, char *ip_addr_str){
+    //use inet_ntop function but first ensure its in network byte order
+    ip_addr = htonl(ip_addr);
+    inet_ntop(AF_INET,&ip_addr,ip_addr_str,16);
+
+
+}
 
 
 
