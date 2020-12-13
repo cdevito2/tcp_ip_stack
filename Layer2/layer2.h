@@ -24,6 +24,9 @@
 
 #include "../net.h"
 #include "../gluethread/glthread.h"
+#include "../graph.h"
+#include <stdlib.h> //this is needed for calloc
+#include "../tcpconst.h"
 
 #pragma pack(push,1)
 typedef struct ethernet_hdr_{
@@ -82,13 +85,13 @@ GLTHREAD_TO_SRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 //MACRO DEFINED TO EVALUATE THE SIZE OF THE ETHERNET HEADER EXCLUDING THE PAYLOAD
 //what this does is it gets the size of the entire ethernet header struct and subtracts the payload size and returns
 #define ETH_HDR_SIZE_EXCL_PAYLOAD   \
-    (sizeof(ethernet_header_t) - sizeof(((ethernet_hdr_t *)0)->payload))
+    (sizeof(ethernet_hdr_t) - sizeof(((ethernet_hdr_t *)0)->payload))
 
 //MACRO DEFINED TO RETURN THE FCS VALUE PRESENT IN THE FRAME
 //what this does it it gets the location of the start of the payload, then adds it to the payload size to get the end
 //at the end of the payload size is the 4 bytes of FCS so we cast to an unsigned int and return
 #define ETH_FCS(eth_hdr_ptr,payload_size)   \
-    (*(unsigned int)(((char *)(((ethernet_hdr_t *)eth_hdr_t->payload)+payload_size)))
+    (*(unsigned int)(((char *)(((ethernet_hdr_t *)eth_hdr_ptr->payload)+payload_size)))
 
 //static function to allocate ethernet header with payload packet
 static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
@@ -123,7 +126,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     }
     //second check comparing dest mac address to interface mac address
     //memcmp compares binary byte buffers we we must use this, must compare size of ethernet header mac address bytes to ensure they are a match
-    if(memcmp(IF_MAC(interface),ethernet_hdr->dest_mac.mac,sizeof(mac_add_t) == 0){
+    if(memcmp(IF_MAC(interface),ethernet_hdr->dest_mac.mac,sizeof(mac_add_t)) == 0){
         //if returns 0 they are the same
         return TRUE;
     }
@@ -151,5 +154,6 @@ void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
 //print arp table
 void dump_arp_table(arp_table_t *arp_table);
 
+void delete_arp_entry(arp_entry_t *arp_entry);
 
 #endif
