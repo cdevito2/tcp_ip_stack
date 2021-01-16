@@ -45,11 +45,30 @@ static int show_nw_topology_handler(param_t *param, ser_buff_t *tlv_buff, op_mod
     }
 }
 
-//handler for run node resolve arp 
+extern void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr);
+
+//handler for run node resolve arp
+//run node <node-name> resolve-arp <ip-address> 
 static int arp_handler(param_t *param, ser_buff_t *tlv_buff, op_mode enable_or_disable){
     node_t *node;
     char *node_name;
+    char *ip_addr;
+    tlv_struct_v *tlv = NULL;
 
+    TLV_LOOP_BEGIN(tlv_buf, tlv){
+        if(strncmp(tlv->leaf_if, "node-name", strlen("node-name")) == 0){
+            node_name = tlv->value;
+        }
+        else if(strncmp(tlv->leaf_id,"ip-address",strlen("ip-adress")) ==0){
+            ip_addr = tlv->value;
+        }
+            
+    }TLV_LOOP_END;
+
+    node = get_node_by_node_name(topo,node_name);
+    send_arp_broadcast_request(node,NULL,ip_addr);
+    //2nd arg is null this function should be smart enough to find the outgoing interface
+    return 0;
 
 
 }

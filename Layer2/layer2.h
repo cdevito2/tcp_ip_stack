@@ -143,6 +143,9 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
 }
 
 
+//function which triggers ARP resolution
+void send_arp_broadcast_request(node_t *node, interfac_t *oif, char *ip_addr);
+
 //function to call when node is created during topology creation
 void init_arp_table(arp_table_t **arp_table);
 //CRUD operations on arp table
@@ -155,5 +158,4 @@ void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
 void dump_arp_table(arp_table_t *arp_table);
 
 void delete_arp_entry(arp_entry_t *arp_entry);
-
 #endif

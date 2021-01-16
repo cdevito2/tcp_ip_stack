@@ -53,7 +53,7 @@ arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr){
     return NULL;
 }
 
-
+/* TODO: FIX THIS AND THE HELPER FUNCTION */
 void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr){
     //loop through arp table and for each entry compare the key, if they match we must delete
     arp_entry_t *arp_entry = arp_table_lookup(arp_table, ip_addr);
@@ -78,15 +78,17 @@ bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry){
     //ensure that you arent entering an existing entry
     arp_entry_t *old_entry = arp_table_lookup(arp_table, arp_entry->ip_addr.ip_addr);
 
+    //compare if old arp entry is equal to the one we are trying to add
     if(old_entry && memcmp(old_entry,arp_entry, sizeof(arp_entry_t)) ==0){
         //no need to do anything in this case
         return FALSE;
     }
-    //case 2 record exists but needs updating
+    //case 2 arp entry exists but needs updating
     if(arp_entry_old){
         delete_arp_table_entry(arp_table, arp_entry->ip_addr.ip_addr);
 
     }
+    //insert the new arp table entry into table
     init_glthread(&arp_entry->arp_glue);
     glthread_add_next(&arp_table->arp_entries, &arp_entry->arp_glue);
     return TRUE;
@@ -118,7 +120,10 @@ void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr,
 
 }
 
+void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
+    //node sending the arp broadcast on the interface for the ip address of which arp resolution is being done
 
+}
 
 void dump_arp_table(arp_table_t *arp_table){
     glthread_t *curr;
