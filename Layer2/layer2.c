@@ -122,7 +122,66 @@ void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr,
 
 void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
     //node sending the arp broadcast on the interface for the ip address of which arp resolution is being done
+    //reserve memory for the eth hdr and the arp hdr
+    unsigned int payload_size = sizeof(arp_hdr_t);
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)calloc(1,ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size);
+    
+    //if the outgoing interface is null, which is until i implement layer3, api must find the outgoing interface to sent msg
+    if(!oif){
+        oif = node_get_matching_subnet_interface(node,ip_addr);
+        //if this interface returns NULL arp resolution is not possible
+        if(!oif){
+            printf("Error : %s : No eligible subnet for ARP resolution for Ip-address : %s\n",node->node_name,ip_addr);
+            return;
+        }
+        //arp res possible 
+        //Prepare ethernet header
+        //dest mac is FFFFFFFF, src mac is outgoing interface mac, type field is 806
+        layer2_fill_with_broadcast_mac(ethernet_hdr->dst_mac.mac);
+        //putting in src mac addr
+        memcpy(ethernet_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t))
+        ethernet_hdr->type = ARP_MSG; //sets type to 806-defined in tcpconst
+        
+        //fill fields of ARP header-payload of ethernet header is the arp packet
+        arp_hdr_t *arp_hdr = (arp_hdr_t *)ethernet_hdr->payload;
+        //first 4 fields are constants
+        arp_hdr->hw_type = 1;
+        arp_hdr->proto_type = 0x8000;
+        arp_hdr->hw_addr_len = sizeof(mac_add_t);
+        arp_hdr->proto_addr_len = 4;
+        //arp broadcast so opcode is 1
+        arp_hdr->op_code = ARP_BROAD_REQ;
+        //next field is the src mac address
+        memcpy(arp_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
+        //next field is the src ip address
+        //convert interface ip to integer form , assign it to arp header
+        inet_pton(AF_INET,IF_IP(oif), &arp_hdr->src_ip);
+        arp_hdr->src_ip = htonl(arp_hdr->src_ip);
+        //dest mac is set to 0 because we dont know it
+        memset(arp_hdr->dest_mac.mac,0,sizeof(mac_add_t));
+        //dest ip is the ip address passed in as the argument
+        inet_pton(AF_INET,ip_addr,&arp_hdr->dest_ip);
+        arp_hdr->dest_ip = htonl(arp_hdr->dest_ip);
+        //only thing left is the FCS field of ethernet hdr
+        //use macro written to access FCS
+        ETH_FCS(ethernet_hdr, sizeof(arp_hdr_t)) = 0;//we arent using it for anything so set to 0
+        
+        //final thing is to send the packet out of local interface
+        send_pkt_out((char *)ethernet_hdr, ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size, oif);
 
+        //free allocated memory 
+        free(ethernet_hdr);
+    }
+}
+//these static functions do not have header defined in the .h file because they are private and no other api will invoke them
+static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
+
+}
+static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif){
+
+}
+static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
+    //make entry into arp table
 }
 
 void dump_arp_table(arp_table_t *arp_table){

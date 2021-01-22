@@ -154,6 +154,42 @@ void dump_nw_graph(graph_t *graph){
 }
 
 
+interface_t *node_get_matching_subnet_interface(node_t *node, char *ip_addr){
+    //loop through all interfaces on a node
+    //get the subnet for each interface ip
+    //apply the subnet value on the ip address given in argument
+    //return if match found, NULL if no match found
+    unsigned int i;
+    interface_t *intf;//this will be what we return if a match
+    char *intf_address = NULL;
+    char mask;
+    char intf_subnet[16];
+    char subnet2[16];
+    for (i=0;i<MAX_INTF_PER_NODE;i++){
+        intf = node->intf[i];
+        if(!intf) return NULL;
+        if(intf->intf_nw_props.is_ipadd_config == FALSE){
+            continue;
+        }
+        //get interface ip address
+        intf_address = IF_IP(intf);
+        //get mask
+        mask = intf->intf_nw_props.mask;
+        //create the subnet- create memory space
+        memset(inft_subnet,0,16);
+        memset(subnet2,0,16);
+        //call apply mask function that i created
+        apply_mask(intf_address,mask,intf_subnet);
+        apply_mask,ip_addr,mask,subnet2);
+        //compare results
+        if(strncmp(intf_subnet,subnet2,16)==0){
+            //return the interface
+            return intf;
+        }
+        
+    }
+}
+
 /*  function that performs right shift of data on a packet buffer and returns pointer to start of data in the right shifted packet buffer */
 
 char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int total_buffer_size){

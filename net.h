@@ -86,7 +86,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 //functions to define in net.c
-
+interface_t * node_get_marching_subnet_interface(node_t *node, char *ip_addr);
 unsigned int ap_addr_p_to_n(char *ip_addr);
 void ip_addr_n_to_p(unsigned int ip_addr, char *ip_addr_str);
 interface_t * node_get_matching_subnet_interface(node_t *node, char *ip_addr);
