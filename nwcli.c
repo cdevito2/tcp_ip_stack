@@ -46,7 +46,22 @@ static int show_nw_topology_handler(param_t *param, ser_buff_t *tlv_buff, op_mod
 }
 
 extern void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr);
+typedef struct arp_table_ arp_table_t;
+extern void dump_arp_table(arp_table_t *arp_table);
 
+static int show_arp_handler(param_t *param, ser_buff_t *tlv_buff, op_mode enable_or_disable){
+    node_t *node;
+    char *node_name;
+    tlv_struct_t *tlv = NULL;
+    TLV_LOOP_BEGIN(tlv_buf, tlv){
+        if(strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0){
+            node_name = tlv->value;
+        }
+    }TLV_LOOP_END
+    node = get_node_by_node_name(topo,node_name);
+    dump_arp_table(NODE_ARP_TABLE(node));
+    return 0;
+}
 //handler for run node resolve arp
 //run node <node-name> resolve-arp <ip-address> 
 static int arp_handler(param_t *param, ser_buff_t *tlv_buff, op_mode enable_or_disable){
@@ -95,6 +110,10 @@ void nw_init_cli(){
         libcli_register_param(show, &topology);
         //set command code
         set_param_cmd_code(&topology, CMDCODE_SHOW_NW_TOPOLOGY);
+        {
+            //show node
+            static param_t node_name;
+        }
 
     }
     //add command negation

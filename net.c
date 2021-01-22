@@ -51,43 +51,6 @@ bool_t node_set_intf_ip_address(node_t *node, char *local_if, char *ip_addr, cha
 }
 
 
-interface_t * node_get_matching_subnet_interface(node_t *node, char *ip_addr){
-    //step 1 is to find the subnet for the passed in ip address
-    char mask;
-    char subnet[16];
-    char sub2[16];
-    unsigned int i = 0;
-    interface_t *intf;
-    char *intf_ip = NULL;
-    //allocate the space for the resulting subnets
-    memset(subnet,0,16);
-    memset(sub2,0,16);
-    //loop through all interfaces on node
-    for(i=0;i<MAX_INTF_PER_NODE;i++){
-        intf = node->intf[i];
-        //ensure we are at a valid interface
-        if(!intf){
-            return NULL;
-        }
-        //if we are here then we have a valid interface, so check if it has assigned ip 
-        if(intf->intf_nw_props.is_ipadd_config == FALSE){
-            continue;
-        }
-        intf_ip = IF_IP(intf);
-        //find mask
-        mask = intf->intf_nw_props.mask;
-        //use utils.c function which determines the subnet id
-        apply_mask(intf_ip,mask,subnet);
-        //do the same for the ip passed in as arg
-        apply_mask(ip_addr,mask,sub2);
-        //compare the resulting char buffers
-        if(strcmp(subnet,sub2) == 0){
-            return intf;
-        }
-
-
-    }
-}
 
 //funciton to convert ip from int form into A.B.C.D/x string form
 void convert_ip_from_int_to_str(unsigned int ip_addr, char *output_buffer){
@@ -176,11 +139,11 @@ interface_t *node_get_matching_subnet_interface(node_t *node, char *ip_addr){
         //get mask
         mask = intf->intf_nw_props.mask;
         //create the subnet- create memory space
-        memset(inft_subnet,0,16);
+        memset(intf_subnet,0,16);
         memset(subnet2,0,16);
         //call apply mask function that i created
         apply_mask(intf_address,mask,intf_subnet);
-        apply_mask,ip_addr,mask,subnet2);
+        apply_mask(ip_addr,mask,subnet2);
         //compare results
         if(strncmp(intf_subnet,subnet2,16)==0){
             //return the interface
@@ -191,7 +154,7 @@ interface_t *node_get_matching_subnet_interface(node_t *node, char *ip_addr){
 }
 
 /*  function that performs right shift of data on a packet buffer and returns pointer to start of data in the right shifted packet buffer */
-
+//TODO: FUNCTION MIGHT NOT BE FINISHED?
 char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int total_buffer_size){
     //note that totalbuffersize is MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE
     char *temp = NULL;

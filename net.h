@@ -79,7 +79,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 #define IF_IP(intf_ptr)     ((intf_ptr)->intf_nw_props.ip_add.ip_addr)
 #define NODE_LO_ADDR(node_ptr)      ((node_ptr)->node_nw_prop.lb_addr.ip_addr)
 #define IS_INTF_L3_MODE(intf_ptr)   ((intf_ptr)->intf_nw_props.is_ipadd_config == TRUE)
-
+#define NODE_ARP_TABLE(node_ptr)    (node_ptr->node_nw_prop.arp_table)
 //macro to return true if interface is in L3 mode or not, false if in L2 mode
 
 

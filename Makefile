@@ -8,9 +8,9 @@ OBJS=gluethread/glthread.o\
 		  graph.o\
 		  topologies.o\
 		  net.o\
-		  nwcli.o\
 		  comm.o\
 		  Layer2/layer2.o\
+		  nwcli.o\
 		  utils.o
 
 test.exe:testapp.o ${OBJS} CommandParser/libcli.a

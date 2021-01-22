@@ -24,14 +24,13 @@
 
 #include "../net.h"
 #include "../gluethread/glthread.h"
-#include "../graph.h"
 #include <stdlib.h> //this is needed for calloc
 #include "../tcpconst.h"
 
 #pragma pack(push,1)
 typedef struct ethernet_hdr_{
     mac_add_t src_mac; //6 bytes
-    mac_add_t dest_mac; //6 bytes
+    mac_add_t dst_mac; //6 bytes
     char payload[248]; //max 1500 bytes but chose smaller
     unsigned int FCS; //CRC field - frame check sequence
     unsigned short type; //2 bytes
@@ -46,7 +45,7 @@ typedef struct arp_hdr_{
     char proto_addr_len;//4 for ipv4
     short op_code;//Arp Req or reply
     mac_add_t src_mac;
-    mac_add_t dest_mac;
+    mac_add_t dst_mac;
     unsigned int src_ip;
     unsigned int dest_ip;
 
@@ -59,9 +58,9 @@ typedef struct arp_table_{
 }arp_table_t;
 
 
-
+/* /
 typedef struct arp_entry_ arp_entry_t;
-
+*/
 struct apr_entry_{
     ip_add_t ip_addr;//key for table
     mac_add_t mac_addr;
@@ -144,13 +143,13 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
 
 
 //function which triggers ARP resolution
-void send_arp_broadcast_request(node_t *node, interfac_t *oif, char *ip_addr);
+void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr);
 
 //function to call when node is created during topology creation
 void init_arp_table(arp_table_t **arp_table);
 //CRUD operations on arp table
 bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry);//CREATE
-arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr)://REPLACE
+arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr);//REPLACE
 void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr, interface_t *iif);//UPDATE
 void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
 
