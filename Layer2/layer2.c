@@ -288,6 +288,48 @@ static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t
 
 }
 
+void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode){
+    //set access or trunk mode for an interface on a node
+    interface_t *interface = get_node_if_by_name(node, intf_name);
+    interface_set_l2_mode(node, interface, intf_l2_mode_str(intf_l2_mode));
+}
+
+void interface_set_l2_mode(node_t *node, interface_t *interface, char *l2_mode_option){
+    intf_l2_mode_t intf_l2_mode;
+    //handle all cases of what the mode can be(access/trunk/unknown)
+    if(strncmp(l2_mode_option, "access", strlen("access")) == 0){
+        //set to access
+        intf_l2_mode = ACCESS;
+    }
+    if(strncmp(l2_mode_option, "trunk", strlen("trunk")) == 0){
+        //set to trunk
+        intf_l2_mode = TRUNK;
+    }
+
+    //now handle cases where the mode is already set and want to overwrite
+    if(IS_INTF_L3_MODE(interface)){
+        //disable and set to L2 mode
+        interface->intf_nw_props_is_ipadd_config = FALSE;
+        IF_L2_MODE(interface) = intf_l2_mode;
+        return;
+    }
+    //handle case whre the mode is unknown
+    if(IF_L2_MODE(interface) == L2_MODE_UNKNOWN){
+        IF_L2_MODE(interface) = intf_l2_mode;
+        return;
+    }
+    //handle case where its access mode and we want to change to trunk
+    if(IF_L2_MODE(interface) == ACCESS && intf_l2_mode == TRUNK){
+        IF_L2_MODE(interface) = intf_l2_mode;
+        return;
+    }
+    //handle case where its trunk mode and we want to change to access
+    if(IF_L2_MODE(interface) == TRUNK && intf_l2_mode == ACCESS){
+        IF_L2_MODE(interface) = intf_l2_mode;
+        return;
+    }
+
+}
 void dump_arp_table(arp_table_t *arp_table){
     glthread_t *curr;
     arp_entry_t *arp_entry;

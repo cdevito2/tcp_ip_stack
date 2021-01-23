@@ -160,6 +160,9 @@ static inline bool_t l2_frame_recv_qualify_on_interace(interface_t *interface, e
 }
 
 
+
+void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode);
+
 //function which triggers ARP resolution
 void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr);
 
