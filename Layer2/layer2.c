@@ -158,7 +158,7 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
         inet_pton(AF_INET,IF_IP(oif), &arp_hdr->src_ip);
         arp_hdr->src_ip = htonl(arp_hdr->src_ip);
         //dest mac is set to 0 because we dont know it
-        memset(arp_hdr->dest_mac.mac,0,sizeof(mac_add_t));
+        memset(arp_hdr->dst_mac.mac,0,sizeof(mac_add_t));
         //dest ip is the ip address passed in as the argument
         inet_pton(AF_INET,ip_addr,&arp_hdr->dest_ip);
         arp_hdr->dest_ip = htonl(arp_hdr->dest_ip);
@@ -195,9 +195,47 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
     }
     //if they are the same we need to send an ARP reply message
     send_arp_reply_msg(ethernet_hdr, iif);
-
-    
 }
+
+void layer2_frame_recv_node(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
+    //first header is ethernet header
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    //check things to see if packet can be processed
+    if(l2_frame_recv_qualify_on_interface(interface, ethernet_hdr) == FALSE){
+        printf("L2 Frame rejected");
+        return;
+    }
+    printf("L2 Frame accepted\n");
+
+    //deside what to do with packet based on type field
+    switch(ethernet_hdr->type){
+        case ARP_MSG::
+        {
+            //access to payload
+            arp_hdr_t *arp_hdr = (arp_hdr_t *)(ethernet_hdr->payload);
+            //check if its a broadcast message or an arp reply
+            switch(arp_hdr->op_code){
+                case ARP_BROAD_REQ:{
+                    process_arp_broadcast_request(node, interface, ethernet_hdr);
+                    break;
+                }
+                case ARP_REPLY:{
+                    process_arp_reply_msg(node, interface, ethernet_hdr);
+                    break;
+                }
+            }
+        }
+        break;
+        default:
+            //assume ip packet
+            //promote to layer3
+            promote_pkt_to_layer3(node, interface, pkt, pkt_size);
+            break;
+    }
+
+
+}
+
 static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif){
     //we need access to the broadcast message to whcich we are replying 
     arp_hdr_t *arp_hdr_in = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_in));

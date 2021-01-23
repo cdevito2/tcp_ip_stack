@@ -125,7 +125,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     }
     //second check comparing dest mac address to interface mac address
     //memcmp compares binary byte buffers we we must use this, must compare size of ethernet header mac address bytes to ensure they are a match
-    if(memcmp(IF_MAC(interface),ethernet_hdr->dest_mac.mac,sizeof(mac_add_t)) == 0){
+    if(memcmp(IF_MAC(interface),ethernet_hdr->dst_mac.mac,sizeof(mac_add_t)) == 0){
         //if returns 0 they are the same
         return TRUE;
     }
@@ -133,12 +133,30 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     
     
     //third check see if dest mac is broadcast address
-    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dest_mac.mac){
+    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac){
         return TRUE;
     }
 
     return FALSE;
 
+}
+
+
+static inline bool_t l2_frame_recv_qualify_on_interace(interface_t *interface, ethernet_hdr_t *ethernet_hdr){
+    if(!interface->is_ipadd_config){
+        return FALSE;
+    }
+
+    //if the interface MAC addr is the ethernet dest mac addr accept
+    if(memcmp(IF_MAC(interface),ethernet_hdr->dst_mac.mac, sizeof(mac_add_t)) == 0){
+        return TRUE;
+    }
+    //if the eth pkt dest mac is broadcast mac accept also
+    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
+        return TRUE;
+    }
+    //else return false
+    return FALSE;
 }
 
 
