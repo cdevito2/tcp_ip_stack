@@ -3,14 +3,14 @@
  *
  *       Filename:  comm.c
  *
- *    Description:  
+ *    Description:  Funcitons which implement node communication
  *
  *        Version:  1.0
  *        Created:  20-12-07 08:14:42 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Chris Devito
  *   Organization:  
  *
  * =====================================================================================
@@ -36,6 +36,19 @@ static char send_buffer[MAX_PACKET_BUFFER_SIZE];
 static char recv_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
 static unsigned int udp_port_number = 40000;
 
+
+
+/* **********************************************************************************
+ * This function is an internal function which actually sends the data from the socket
+ * Flow:
+ *      Creates a sockaddr struct with the required information.
+ *      Calls the sendto function which sends to the file descriptor specified.
+ * Args:
+ *      sock_fd - the filedescriptor of the socket to send to
+ *      pkt_data - the pkt to send out of the socket
+ *      pkt_size - the size of the pkt
+ *      dest_udp_port_no - the port number of the recv node 
+ * **********************************************************************************     */
 static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, unsigned int dst_udp_port_no){
     //need to create sockaddr struct and invoke sendto
     int rc;
@@ -50,8 +63,10 @@ static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, uns
     rc = sendto(sock_fd,pkt_data,pkt_size,0,(struct sockaddr *)&dest_addr, sizeof(struct sockaddr));
     return rc;
 
-
 }
+
+
+
 
 //this is internal function hence i made it static
 static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsigned int pkt_size){
@@ -69,12 +84,37 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
 }
 
 
+
+
+
 static unsigned int get_next_udp_port(){
     return udp_port_number++;
 }
 
+
+
+
+
 //import external function from layer2.c 
 extern void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size);
+
+
+
+
+
+
+
+
+/*  This funciton is called when an interface receives a packet
+ *  Flow:
+ *      logs print msg stating that pkt has been recvd, shifts the
+ *      pkt to the start of the data, and calls external function
+ *      layer2_frame_recv.
+ *  Args:
+ *      node - the node which has an interface which recv the pkt
+ *      interface - the interface which recv the packet
+ *      pkt - the pkt that was recv
+ *      pkt_size - the size of the pkt that was recv */
 
 int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //entry point into link layer
@@ -90,6 +130,10 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
     return 0;
     
 }
+
+
+
+
 
 int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
     //3rd argument is local interface to send out
@@ -135,6 +179,10 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
 }
 
 
+
+
+
+
 void init_udp_socket(node_t *node){
     //assign udp port number and create socket
     node->udp_port_number = get_next_udp_port();
@@ -159,6 +207,9 @@ void init_udp_socket(node_t *node){
     node->udp_sock_fd = udp_sock_fd;
 
 }
+
+
+
 
 
 static void * _network_start_pkt_receiver_thread(void *arg){
@@ -223,6 +274,9 @@ static void * _network_start_pkt_receiver_thread(void *arg){
 }
 
 
+
+
+
 int send_pkt_flood(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size){
     //send packet out of all node interfaces except the exempt interface
     //loop through the node list of interface
@@ -246,6 +300,18 @@ int send_pkt_flood(node_t *node, interface_t *exempted_intf, char *pkt, unsigned
     }
 }
 
+
+
+/* This function floods a packet out of all L2 interfaces
+ * Args:
+ *      node(node_t): the node of which to send the pkt out of its interfaces
+ *      exepted_intf(interface_t): the interface which received the pkt, dont need to send it bal
+ *      pkt(char *): the packet to flood out of the interfaces
+ *      pkt_size(unsigned int): the size of the packet 
+ *
+ * Returns:
+ *           */
+
 int send_pkt_flood_l2_intf_only(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size){
     unsigned int i=0;
     interface_t *intf;
@@ -258,9 +324,14 @@ int send_pkt_flood_l2_intf_only(node_t *node, interface_t *exempted_intf, char *
             continue;
         }
         //if we reach here we are an l2 interface 
-        send_pkt_out(pkt,pkt_size,interface);
+        send_pkt_out(pkt,pkt_size,intf);
     }
 }
+
+
+
+
+
 
 void network_start_pkt_receiver_thread(graph_t *topo){
     //invoke thread to monitor file descriptors

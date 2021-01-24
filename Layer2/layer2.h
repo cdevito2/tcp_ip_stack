@@ -47,11 +47,12 @@ typedef struct arp_hdr_{
     mac_add_t src_mac;
     mac_add_t dst_mac;
     unsigned int src_ip;
-    unsigned int dest_ip;
+    unsigned int dst_ip;
 
 }arp_hdr_t;
 
 
+#pragma pack(pop)
 
 typedef struct arp_table_{
     glthread_t arp_entries;
@@ -61,22 +62,16 @@ typedef struct arp_table_{
 /* /
 typedef struct arp_entry_ arp_entry_t;
 */
-struct apr_entry_{
+typedef struct apr_entry_{
     ip_add_t ip_addr;//key for table
     mac_add_t mac_addr;
-    char oif[IF_NAME_SIZE];
+    char oif_name[IF_NAME_SIZE];
     bool_t is_sane;
     glthread_t arp_glue;
     //for future implementation list of pending packets for arp res
     glthread_t arp_pending_list;
-};
-GLTHREAD_TO_SRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
-
-
-
-
-
-#pragma pack(pop)
+}arp_entry_t;
+GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 
 
 
@@ -90,7 +85,7 @@ GLTHREAD_TO_SRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 //what this does it it gets the location of the start of the payload, then adds it to the payload size to get the end
 //at the end of the payload size is the 4 bytes of FCS so we cast to an unsigned int and return
 #define ETH_FCS(eth_hdr_ptr,payload_size)   \
-    (*(unsigned int)(((char *)(((ethernet_hdr_t *)eth_hdr_ptr->payload)+payload_size)))
+    (*(unsigned int *)(((char *)(((ethernet_hdr_t *)eth_hdr_ptr)->payload)+payload_size)))
 
 //static function to allocate ethernet header with payload packet
 static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
@@ -133,7 +128,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     
     
     //third check see if dest mac is broadcast address
-    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac){
+    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
         return TRUE;
     }
 
@@ -143,9 +138,6 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
 
 
 void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode);
-
-//function which triggers ARP resolution
-void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr);
 
 //function to call when node is created during topology creation
 void init_arp_table(arp_table_t **arp_table);

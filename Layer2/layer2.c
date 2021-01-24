@@ -19,7 +19,6 @@
 #include "graph.h"
 #include <stdio.h>
 #include "comm.h"
-#include <stdlib.h>
 #include <sys/socket.h>
 #include "layer2.h"
 #include <arpa/inet.h>
@@ -38,7 +37,7 @@ void init_arp_table( arp_table_t **arp_table){
 arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr){
     //lookup entry using ip as key 
     //loop through arp table 
-    glthread *curr;
+    glthread_t *curr;
     arp_entry_t *arp_entry;
     ITERATE_GLTHREAD_BEGIN(&arp_table->arp_entries,curr){
         //for each entry compare the key of entry to the ip passed as argument
@@ -81,7 +80,7 @@ bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry){
         return FALSE;
     }
     //case 2 arp entry exists but needs updating
-    if(arp_entry_old){
+    if(old_entry){
         delete_arp_table_entry(arp_table, arp_entry->ip_addr.ip_addr);
 
     }
@@ -95,7 +94,6 @@ bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry){
 void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr, interface_t *iif){
     //only src ip and src mac are of interest
     unsigned int src_ip =0;
-    assert(arp_hdr->op_code == ARP_REPLY);
     //create memory for new entry
     arp_entry_t *arp_entry = calloc(1,sizeof(arp_entry_t));
     src_ip = htonl(arp_hdr->src_ip);
@@ -104,11 +102,11 @@ void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr,
     arp_entry->ip_addr.ip_addr[15] = '\0';
 
     //copy mac address into arp entry
-    memcpy(&arp_entry->mac_addr.mac,arp_hdr->src_mac,sizeof(mac_add_t));
+    memcpy(arp_entry->mac_addr.mac,arp_hdr->src_mac.mac,sizeof(mac_add_t));
     //also need the receiving interface for arp entry
     strncpy(arp_entry->oif_name,iif->if_name, IF_NAME_SIZE);
     //now add the entry to the table
-    bool rc = arp_table_entry_add(arp_table,arp_entry);
+    bool_t rc = arp_table_entry_add(arp_table,arp_entry);
 
     if(rc == FALSE){
         //free memory
@@ -136,7 +134,7 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
         //dest mac is FFFFFFFF, src mac is outgoing interface mac, type field is 806
         layer2_fill_with_broadcast_mac(ethernet_hdr->dst_mac.mac);
         //putting in src mac addr
-        memcpy(ethernet_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t))
+        memcpy(ethernet_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
         ethernet_hdr->type = ARP_MSG; //sets type to 806-defined in tcpconst
         
         //fill fields of ARP header-payload of ethernet header is the arp packet
@@ -157,8 +155,8 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
         //dest mac is set to 0 because we dont know it
         memset(arp_hdr->dst_mac.mac,0,sizeof(mac_add_t));
         //dest ip is the ip address passed in as the argument
-        inet_pton(AF_INET,ip_addr,&arp_hdr->dest_ip);
-        arp_hdr->dest_ip = htonl(arp_hdr->dest_ip);
+        inet_pton(AF_INET,ip_addr,&arp_hdr->dst_ip);
+        arp_hdr->dst_ip = htonl(arp_hdr->dst_ip);
         //only thing left is the FCS field of ethernet hdr
         //use macro written to access FCS
         ETH_FCS(ethernet_hdr, sizeof(arp_hdr_t)) = 0;//we arent using it for anything so set to 0
@@ -170,10 +168,56 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
         free(ethernet_hdr);
     }
 }
+
+
+static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif){
+    //we need access to the broadcast message to whcich we are replying 
+    arp_hdr_t *arp_hdr_in = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_in));
+    //need to create new packet- to encapsulate the arp in
+    ethernet_hdr_t *ethernet_hdr_reply = (ethernet_hdr_t *)calloc(1, MAX_PACKET_BUFFER_SIZE);
+    //move the src mac of the broadcast message to dest mac of the reply
+    memcpy(ethernet_hdr_reply->dst_mac.mac, arp_hdr_in->src_mac.mac, sizeof(mac_add_t));
+    //create the src mac address of the reply
+    memcpy(ethernet_hdr_reply->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
+    //set type to 806 
+    ethernet_hdr_reply->type = ARP_MSG;
+    //now prepare contents of arp reply msg
+    arp_hdr_t *arp_hdr_reply = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_reply));
+    //fill the 4 const fields
+    arp_hdr_reply->hw_type = 1;
+    arp_hdr_reply->proto_type = 0x8000;
+    arp_hdr_reply->hw_addr_len = sizeof(mac_add_t);
+    arp_hdr_reply->proto_addr_len = 4;
+    //opcode is arp reply which is defined in tcpconst which is 2
+    arp_hdr_reply->op_code = ARP_REPLY;
+    //set arp reply src mac
+    memcpy(arp_hdr_reply->src_mac.mac,IF_MAC(oif), sizeof(mac_add_t));
+    // set src ip is ip of outgoing if
+    inet_pton(AF_INET,IF_IP(oif), &arp_hdr_reply->src_ip);
+    arp_hdr_reply->src_ip = htonl(arp_hdr_reply->src_ip);
+    //set the dest mac to the src mac of the arp broad msg
+    memcpy(arp_hdr_reply->dst_mac.mac, arp_hdr_reply->src_mac.mac, sizeof(mac_add_t));
+
+    //set dest ip to src ip of arp broad
+    arp_hdr_reply->dst_ip = arp_hdr_in->src_ip;
+    //set FCS to 0
+    ETH_FCS(ethernet_hdr_reply,sizeof(arp_hdr_t)) = 0;
+
+    unsigned int total_pkt_size = ETH_HDR_SIZE_EXCL_PAYLOAD + sizeof(arp_hdr_t);
+    //right shift packet in the buffer
+
+    char *shifted_pkt_buffer = pkt_buffer_shift_right((char *)ethernet_hdr_reply, total_pkt_size, MAX_PACKET_BUFFER_SIZE);
+
+    //now send packet and free memory
+    send_pkt_out(shifted_pkt_buffer, total_pkt_size, oif);
+    free(ethernet_hdr_reply);
+
+}
+
 //these static functions do not have header defined in the .h file because they are private and no other api will invoke them
 static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
     //print that msg has been recv
-    printf("%s: ARP broadcast msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iff->att_node->node_name);
+    printf("%s: ARP broadcast msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iif->att_node->node_name);
 
     //check if node is eligible to process msg
     //if its not, simply discard
@@ -194,6 +238,14 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
     send_arp_reply_msg(ethernet_hdr, iif);
 }
 
+static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
+    //make entry into arp table
+    //invoked by node when node recv msg
+    printf("%s : ARP reply msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iif->att_node->node_name);
+    //node has to make entry in arp table
+    arp_table_update_from_arp_reply(NODE_ARP_TABLE(node),(arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),iif);
+
+}
 void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //first header is ethernet header
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
@@ -207,7 +259,7 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
     //deside what to do with packet based on type field
     if(IS_INTF_L3_MODE(interface)){
         switch(ethernet_hdr->type){
-            case ARP_MSG::
+            case ARP_MSG:
             {
                 //access to payload
                 arp_hdr_t *arp_hdr = (arp_hdr_t *)(ethernet_hdr->payload);
@@ -243,63 +295,7 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
 
 }
 
-static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif){
-    //we need access to the broadcast message to whcich we are replying 
-    arp_hdr_t *arp_hdr_in = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_in));
-    //need to create new packet- to encapsulate the arp in
-    ethernet_hdr_t *ethernet_hdr_reply = (ethernet_hdr_t *)calloc(1, MAX_PACKET_BUFFER_SIZE);
-    //move the src mac of the broadcast message to dest mac of the reply
-    memcpy(ethernet_hdr_reply->dst_mac.mac, arp_hdr_in->src_mac.mac, sizeof(mac_add_t));
-    //create the src mac address of the reply
-    memcpy(ethernet_hdr_reply->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
-    //set type to 806 
-    ethernet_hdr_reply->type = ARP_MSG;
-    //now prepare contents of arp reply msg
-    arp_hdr_t *arp_hdr_reply = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_reply));
-    //fill the 4 const fields
-    arp_hdr_reply->hw_type = 1;
-    arp_hdr_reply->proto_type = 0x8000;
-    arp_hdr_reply->hw_addr_len = sizeof(mac_add_t);
-    arp_hdr_reply->proto_addr_len = 4;
-    //opcode is arp reply which is defined in tcpconst which is 2
-    arp_hdr_reply->op_code = ARP_REPLY;
-    //set arp reply src mac
-    memcpy(arp_hdr_reply->src_mac.mac,IF_MAC(oif), sizeof(mac_add_t));
-    // set src ip is ip of outgoing if
-    inet_pton(AF_INET,IF_IP(oif), &arp_hdr_reply->src_ip);
-    arp_hdr_reply->src_ip = htonl(arp_hdr_reply->src_ip);
-    //set the dest mac to the src mac of the arp broad msg
-    memcpy(arp_hdr_reply->dst_mac.mac, arp_hdr_ip->src_mac.mac, sizeof(mac_add_t));
 
-    //set dest ip to src ip of arp broad
-    arp_hdr_reply->dst_ip = arp_hdr_in->src_ip;
-    //set FCS to 0
-    ETH_FCS(ethernet_hdr_reply,sizeof(arp_hdr_t)) = 0;
-
-    unsigned int total_pkt_size = ETH_HDR_SIZE_EXCL_PAYLOAD + sizeof(arp_hdr_t);
-    //right shift packet in the buffer
-
-    char *shifted_pkt_buffer = pkt_buffer_shift_right((char *)ethernet_hdr_reply, total_pkt_size, MAX_PACKET_BUFFER_SIZE);
-
-    //now send packet and free memory
-    send_pkt_out(shifted_pkt_buffer, total_pkt_size, oif);
-    free(ethernet_hdr_reply);
-
-}
-static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
-    //make entry into arp table
-    //invoked by node when node recv msg
-    printf("%s : ARP reply msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iif->att_node->node_name);
-    //node has to make entry in arp table
-    arp_table_update_from_arp_reply(NODE_ARP_TABLE(node),(arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),iif);
-
-}
-
-void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode){
-    //set access or trunk mode for an interface on a node
-    interface_t *interface = get_node_if_by_name(node, intf_name);
-    interface_set_l2_mode(node, interface, intf_l2_mode_str(intf_l2_mode));
-}
 
 void interface_set_l2_mode(node_t *node, interface_t *interface, char *l2_mode_option){
     intf_l2_mode_t intf_l2_mode;
@@ -316,7 +312,7 @@ void interface_set_l2_mode(node_t *node, interface_t *interface, char *l2_mode_o
     //now handle cases where the mode is already set and want to overwrite
     if(IS_INTF_L3_MODE(interface)){
         //disable and set to L2 mode
-        interface->intf_nw_props_is_ipadd_config = FALSE;
+        interface->intf_nw_props.is_ipadd_config = FALSE;
         IF_L2_MODE(interface) = intf_l2_mode;
         return;
     }
@@ -336,6 +332,12 @@ void interface_set_l2_mode(node_t *node, interface_t *interface, char *l2_mode_o
         return;
     }
 
+}
+
+void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode){
+    //set access or trunk mode for an interface on a node
+    interface_t *interface = get_node_if_by_name(node, intf_name);
+    interface_set_l2_mode(node, interface, intf_l2_mode_str(intf_l2_mode));
 }
 void dump_arp_table(arp_table_t *arp_table){
     glthread_t *curr;

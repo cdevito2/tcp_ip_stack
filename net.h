@@ -15,16 +15,17 @@
  *
  * =====================================================================================
  */
-#include <memory.h>
-#include "utils.h"
 #ifndef __NET__
 #define __NET__
+
+#include "utils.h"
+#include <memory.h>
 
 typedef struct graph_ graph_t;
 typedef struct node_ node_t;
 typedef struct interface_ interface_t;
 typedef struct arp_table_ arp_table_t;
-
+typedef struct mac_table_ mac_table_t;
 
 
 typedef enum {
@@ -42,29 +43,38 @@ static inline char * intf_l2_mode_str(intf_l2_mode_t intf_l2_mode){
         case TRUNK:
             return "trunk";
         default:
-            return "L2_MODE_UNKNOWN;
+            return "L2_MODE_UNKNOWN";
     }
 }
 
 
 
 #pragma pack(push,1)
-typedef struct ip_addr_{
+typedef struct ip_add_{
     char ip_addr[16]; //maximum of 15 characters
 }ip_add_t;
 
-typedef struct mac_addr_{
+typedef struct mac_add_{
     char mac[48];
-}mac_addr_t;
+}mac_add_t;
 
 typedef struct node_nw_prop_{
     bool_t is_lb_addr_config;//bool to see if loopback configured
+    
     ip_add_t lb_addr; //loopback address
+    
     arp_table_t *arp_table;
+    
     mac_table_t *mac_table;
+
 }node_nw_prop_t;
 #pragma pack(pop)
+
+
 extern void init_arp_table(arp_table_t **arp_table);
+extern void init_mac_table(mac_table_t **mac_table);
+
+
 
 //function to initia;ize network properties of node
 static inline void init_node_nw_prop(node_nw_prop_t *node_nw_prop){
@@ -72,8 +82,11 @@ static inline void init_node_nw_prop(node_nw_prop_t *node_nw_prop){
     node_nw_prop->is_lb_addr_config = FALSE;
     memset(node_nw_prop->lb_addr.ip_addr,0,16);
     init_arp_table(&(node_nw_prop->arp_table));
-
+    init_mac_table(&(node_nw_prop->mac_table));
 }
+
+
+
 
 typedef struct intf_nw_props{
     //every interface needs a mac address
@@ -89,6 +102,8 @@ typedef struct intf_nw_props{
 }intf_nw_props_t;
 
 
+
+
 //function to initialize network properties of interface
 static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
     /* default init */
@@ -98,6 +113,9 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
     intf_nw_props->is_ipadd_config = FALSE;
 
 }
+
+
+
 
 //create some shorthand macros
 
