@@ -31,4 +31,5 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
 
 int send_pkt_flood(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size);
 
+int send_pkt_flood_l2_intf_only(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size);
 #endif

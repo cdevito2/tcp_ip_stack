@@ -108,6 +108,78 @@ void init_mac_table(mac_table_t **mac_table){
 }
 
 
+static void l2_switch_perform_mac_learning(node_t *node, char *src_mac, char *if_name){
+    bool_t rc;
+    //create mac table entry
+    mac_table_entry_t *mac_table_entry = calloc(1,sizeof(mac_table_entry_t));
+    //copy the src mac and if name into the entry
+    memcpy(mac_table_entry->mac.mac,src_mac, sizeof(mac_add_t));
+    strncpy(mac_table_entry->oif_name,if_name,IF_NAME_SIZE);
+
+    //esc char for interface
+    mac_table_entry->oif_name[IF_NAME_SIZE -1] = '\0';
+    //add the entry into the table
+    rc = mac_table_entry_add(NODE_MAC_TABLE(node), mac_table_entry);
+    if(rc==FALSE){
+        free(mac_table_entry);
+    }
+}
+
+
+
+static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface, 
+                                    char *pkt, unsigned int pkt_size){
+    //purpose is to find the correct outgoing interface
+    //todo this we do a mac lookup with the key being the destination mac address
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    //check if dest mac is broadcast address
+    if(IS_MAC_BROADCAST_ADR(ethernet_hdr->dst_mac.mac)){
+        //flood out of all l2 interfaces except current one
+        send_pkt_flood_l2_intf_only(node, recv_intf, pkt, pkt_size);
+    }
+
+    //now do mac table lookup
+    mac_table_entry_t *mac_table_entry = mac_table_lookup(NODE_MAC_TABLE(node), ethernet_hdr->dst_mac.mac);
+
+    //if no match found flood pkt 
+    if(!mac_table_entry){
+        send_plt_flood_l2_intf_only(node, recv_intf, pkt, pkt_size);
+    }
+
+    //if match found send packet out of specific interface
+    
+    char *oif_name = mac_table_entry->oif_name;
+    interface_t *oif = get_node_if_by_name(node, oif_name);
+    if(!oif){
+        return;
+    }
+    //send pkt 
+    send_pkt_out(pkt,pkt_size,oif);
+
+}
+
+
+
+void l2_switch_recv_frame(interface_t *interface, char *pkt, unsigned int pkt_size){
+    //2 functions are to perform mac learning and to forward frame
+    //step 1: extract the src and destination mac address
+    node_t *node = interface->att_node;
+    
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+
+    char *dst_mac = (char *)ethernet_hdr->dst_mac.mac;
+    char *src_mac = (char *)ethernet_hdr->src_mac.mac;
+
+    //perform mac learning to add to the mac table
+    l2_switch_perform_mac_learning(node,src_mac, interface->if_name);
+
+    l2_switch_forward_frame(node, interface, pkt, pkt_size);
+}
+
+
+
+
+
 
 void dump_mac_table(mac_table_t *mac_table){
 

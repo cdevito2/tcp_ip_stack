@@ -24,9 +24,6 @@
 #include "layer2.h"
 #include <arpa/inet.h>
 
-void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
-    //entry point into TCP/IP stack from the bottom
-}
 
 void init_arp_table( arp_table_t **arp_table){
     //calloc arp table
@@ -197,7 +194,7 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
     send_arp_reply_msg(ethernet_hdr, iif);
 }
 
-void layer2_frame_recv_node(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
+void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //first header is ethernet header
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
     //check things to see if packet can be processed
@@ -208,29 +205,39 @@ void layer2_frame_recv_node(node_t *node, interface_t *interface, char *pkt, uns
     printf("L2 Frame accepted\n");
 
     //deside what to do with packet based on type field
-    switch(ethernet_hdr->type){
-        case ARP_MSG::
-        {
-            //access to payload
-            arp_hdr_t *arp_hdr = (arp_hdr_t *)(ethernet_hdr->payload);
-            //check if its a broadcast message or an arp reply
-            switch(arp_hdr->op_code){
-                case ARP_BROAD_REQ:{
-                    process_arp_broadcast_request(node, interface, ethernet_hdr);
-                    break;
-                }
-                case ARP_REPLY:{
-                    process_arp_reply_msg(node, interface, ethernet_hdr);
-                    break;
+    if(IS_INTF_L3_MODE(interface)){
+        switch(ethernet_hdr->type){
+            case ARP_MSG::
+            {
+                //access to payload
+                arp_hdr_t *arp_hdr = (arp_hdr_t *)(ethernet_hdr->payload);
+                //check if its a broadcast message or an arp reply
+                switch(arp_hdr->op_code){
+                    case ARP_BROAD_REQ:{
+                        process_arp_broadcast_request(node, interface, ethernet_hdr);
+                        break;
+                    }
+                    case ARP_REPLY:{
+                        process_arp_reply_msg(node, interface, ethernet_hdr);
+                        break;
+                    }
                 }
             }
-        }
-        break;
-        default:
-            //assume ip packet
-            //promote to layer3
-            promote_pkt_to_layer3(node, interface, pkt, pkt_size);
             break;
+            default:
+                //assume ip packet
+                //promote to layer3
+                promote_pkt_to_layer3(node, interface, pkt, pkt_size);
+                break;
+        }
+    }
+    else if(IF_L2_MODE(interface) == ACCESS || IF_L2_MODE(interface) == TRUNK){
+        //l2 switch received
+        l2_switch_recv_frame(interface, pkt, pkt_size);
+    }
+    else{
+        //do nothing
+        return;
     }
 
 
