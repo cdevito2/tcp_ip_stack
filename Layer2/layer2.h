@@ -51,6 +51,25 @@ typedef struct arp_hdr_{
 
 }arp_hdr_t;
 
+ /*  VLAN SUPPORT STRUCTURES */
+
+//4 byte vlan header
+ typedef struct vlan_8021q_hdr_{
+    unsigned short tpid; // set to 0x8100
+    short tci_pcp : 3;  //3 bits, not using
+    short tci_dei : 1; //1 bit, not using
+    short tci_vid : 12; //12 bits. vlan id
+ }
+
+
+typedef struct vlan_ethernet_hdr_{
+    mac_add_t dst_mac;
+    mac_add_t src_mac;i
+    vlan_8021q_hdr_t vlan_8021q_hdr;
+    unsigned short type;
+    char payload[248];
+    unsigned int FCS;
+}vlan_ethernet_hdr_t;
 
 #pragma pack(pop)
 
@@ -81,11 +100,33 @@ GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 #define ETH_HDR_SIZE_EXCL_PAYLOAD   \
     (sizeof(ethernet_hdr_t) - sizeof(((ethernet_hdr_t *)0)->payload))
 
+
+
+
+#define VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD  \
+    (sizeof(vlan_ethernet_hdr_t) - sizeof(((vlan_etherent_hdr_t *)0)->payload))
+
+
+
+
 //MACRO DEFINED TO RETURN THE FCS VALUE PRESENT IN THE FRAME
 //what this does it it gets the location of the start of the payload, then adds it to the payload size to get the end
 //at the end of the payload size is the 4 bytes of FCS so we cast to an unsigned int and return
 #define ETH_FCS(eth_hdr_ptr,payload_size)   \
     (*(unsigned int *)(((char *)(((ethernet_hdr_t *)eth_hdr_ptr)->payload)+payload_size)))
+
+
+
+
+#define VLAN_ETH_FCS(vlan_eth_hdr_ptr,payload_size) \
+    (*(unsigned int *)(((char *)(((vlan_ethernet_hdr_t *)vlan_eth_hdr_ptr)->payload)+payload_size)))
+
+
+
+#define ETH_COMMON_FCS(eth_hdr_ptr,payload_size)    \
+    (is_pkt_vlan_tagged(eth_hdr_ptr) ? VLAN_ETH_FCS(eth_hdr_ptr,payload_size) : \
+        ETH_FCS(eth_hdr_ptr,payload_size))
+
 
 //static function to allocate ethernet header with payload packet
 static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
@@ -96,13 +137,14 @@ static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_s
     memcpy(temp,pkt,pkt_size);
 
     ethernet_hdr_t *header = (ethernet_hdr_t *)(pkt - ETH_HDR_SIZE_EXCL_PAYLOAD);
+    memset((char *)header,0,ETH_HDR_SIZE_EXCL_PAYLOAD)
     //header is now pointing to where the payload data should be written to in the ethernet header
     memset(header,0,ETH_HDR_SIZE_EXCL_PAYLOAD);
     //above line sets all fields before the payload to be zero
     memcpy(header->payload,temp,pkt_size);
     free(temp);
     //set the FCS to be zero
-    ETH_FCS(header,pkt_size) = 0;    
+    SET_COMMON_ETH_FCS(header,pkt_size) = 0;    
 
 }
 
@@ -135,6 +177,78 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     return FALSE;
 
 }
+
+
+
+
+/*  This function takes in an ethernet frame and determines if it is tagged or not */
+/*  Returns NULL if frame not tagges, pointer to vlan hdr if it is tagged */
+static inline vlan_8021q_hdr_t *is_pkt_vlan_tagged(ethernet_hdr_t *ethernet_hdr){
+    //13th and 14th byte in the vlan tagged and non vlan tagged eth hdr
+    if(ethernet_hdr->type == 0x8100){
+        return (vlan_8021q_hdr_t *)&(ethernet_hdr->type); //return pointer to the vlan tagged hdr
+    }
+    else{
+        return NULL; //untagged frame
+    }
+}
+
+
+
+
+
+
+//This function returns the VLAN ID present in the vlan tagged ethernet frame
+static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
+    return (unsigned int)(vlan_8021q_hdr->tcp_vid);
+}
+
+
+
+
+
+/*  This function returns the pointer to the start of the payload for a tagged or untagged ethernet hdr frame */
+static inline char * GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_t *ethernet_hdr){
+    if(is_pkt_vlan_tagged(ethernet_hdr){ //check if its tagged
+        (vlan_ethernet_hdr_t *)ethernet_hdr;
+        return ethernet_hdr->payload;
+    }
+    else{
+        return ethernet_hdr->payload;
+    }
+}
+
+
+/*  This function sets the FCS value of an untagged or a tagged eth frame */
+static inline void SET_COMMON_ETH_FCS(ethernet_hdr_t *ethernet_hdr, unsigned int payload_size, unsigned int new_fcs){
+
+    if(is_pkt_vlan_tagged(ethernet_hdr)){ //check if tagged
+        VLAN_ETH_FCS(ethernet_hdr,payload_size) = new_fcs;
+    }
+    else{
+        ETH_FCS(Ethernet_hdr,payload_size) = new_fcs;
+    }
+}
+
+
+
+
+
+/*  This function returns the ethernet hdr size excluding payload for a tagged or untagged frame */
+static inline unsigned int GET_ETH_HDR_SIZE_EXCL_PAYLOAD(ethernet_hdr_t *ethernet_hdr){
+    if(is_pkt_vlan_tagged(ethernet_hdr)){
+        return VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD;
+    }
+    else{
+        return ETH_HDR_SIZE_EXCL_PAYLOAD;
+    }
+}
+
+
+        
+
+
+
 
 
 void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode);
