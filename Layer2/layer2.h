@@ -248,18 +248,34 @@ static inline unsigned int GET_ETH_HDR_SIZE_EXCL_PAYLOAD(ethernet_hdr_t *etherne
         
 
 
+/*  functions to ta/untagg frame with ethernet vlan id */
+ethernet_hdr_t *tag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned int total_pkt_size, int vlan_id, unsigned int *new_pkt_size);
+ethernet_hdr_t *untag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned int total_pkt_size, unsigned int *new_pkt_size);
+
 
 
 
 void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode);
+void node_set_intf_vlan_membership(node_t *node, char *intf_name unsigned int vlan_id);
+
+
+
+
 
 //function to call when node is created during topology creation
 void init_arp_table(arp_table_t **arp_table);
+
+
+
+
 //CRUD operations on arp table
 bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry);//CREATE
 arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr);//REPLACE
 void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr, interface_t *iif);//UPDATE
 void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
+
+
+
 
 //print arp table
 void dump_arp_table(arp_table_t *arp_table);

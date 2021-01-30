@@ -21,6 +21,8 @@
 #include "utils.h"
 #include <memory.h>
 
+#define MAX_VLAN_MEMBERSHIP 10
+
 typedef struct graph_ graph_t;
 typedef struct node_ node_t;
 typedef struct interface_ interface_t;
@@ -98,6 +100,7 @@ typedef struct intf_nw_props{
     char mask;
     //flag to see if ip address configured
     bool_t is_ipadd_config;
+    unsigned int vlans[MAX_VLAN_MEMBERSHIP];
 
 }intf_nw_props_t;
 
