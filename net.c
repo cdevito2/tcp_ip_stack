@@ -185,9 +185,46 @@ void ip_addr_n_to_p(unsigned int ip_addr, char *ip_addr_str){
     //use inet_ntop function but first ensure its in network byte order
     ip_addr = htonl(ip_addr);
     inet_ntop(AF_INET,&ip_addr,ip_addr_str,16);
-
-
 }
+
+
+//funciton which vlan membership for an interface passed as an argument
+unsigned int get_access_intf_operating_vlan_id(interface_t *interface){
+    //only called in access mode so should only have 1 VLAN
+    if(IF_L2_MODE(interface) == TRUNK){
+        return;
+    }
+    return interface->intf_nw_props.vlans[0];
+}
+
+
+
+
+//function checks if a switch in trunk mode has a match for the passed in vlan id
+bool_t is_trunk_interface_vlan_enabled(interface_t *interface, unsigned int vlan_id){
+    if(IF_L2_MODE(interface) == ACCESS){
+        return;
+    }
+    unsigned int i=0;
+    for(;i<MAX_VLAN_MEMBERSHIP;i++){
+        if(interface->intf_nw_props.vlans[i] == vlan_id){
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

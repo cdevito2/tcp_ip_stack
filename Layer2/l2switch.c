@@ -127,6 +127,122 @@ static void l2_switch_perform_mac_learning(node_t *node, char *src_mac, char *if
 
 
 
+
+
+
+static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *oif){
+    //case 1 - if interface l3 mode assert
+    assert(!IS_INTF_L3_MODE(oif));
+
+    intf_l2_mode_t intf_l2_mode = IF_L2_MODE(oif);
+
+    //case 6 unknown l2 mode
+    if(intf_l2_mode == UNKNOWN){
+        return FALSE;
+    }
+
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    vlan_8021q_hdr_t *vlan_8021q_hdr = is_pkt_vlan_tagged(ethernet_hdr);
+
+
+    switch(intf_l2_mode){
+        case ACCESS:
+            {
+                unsigned int intf_vlan_id = get_access_intf_operating_vlan_id(oif);
+            
+                //case 1 - not vlan enabled and pkt is not tagged, simply forward it
+                if(!intf_Vlan_id && !vlan_8021q_hdr){
+                    send_pkt_out(pkt,pkt_size, oif);
+                    return TRUE;
+                }
+
+                //case 2 - pkt is not tagged, interface vlan enabled, drop pkt
+                if(intf_vlan_id && !vlan_8021q_hdr){
+                    return FALSE;
+                }
+
+                //case 4 - pkt is tagged, interface not vlan enabled, drop pkt
+                if(!intf_vlan_id && vlan_8021q_hdr){
+                    return FALSE;
+                }
+
+
+                //case 5 - pkt is tagged and interface vlan enabled and the vlan id match
+                if(vlan_8021q_hdr && (intf_vlan_id == GET_802_1Q_VLAN_ID(vlan_8021q_hdr))){
+                    //l2 switch untaggs frame here
+                    unsigned int *new_pkt_size = 0;
+                    ethernet_hdr = untag_pkt_with_vlan_id(ethernet_hdr, pkt_size, &new_pkt_size);
+                    send_pkt_out((char *)ethernet_hdr, new_pkt_size, oif);
+                    return TRUE;
+                }
+            }
+            break;
+        case TRUNK:
+            {
+                
+               //pkt taggeed, int trunk mode, vlan match , l2 switch forward
+               unsigned int pkt_vlan_id=0;
+               if(vlan_8021q_hdr){
+                   pkt_vlan_id = GET_802_1Q_VLAN_ID(vlan_8021q_hdr);
+               }
+
+               if(pkt_vlan_id && is_trunk_interface_vlan_enabled(oif,pkt_vlan_id)){
+                    send_pkt_out(pkt, pkt_size, oif);
+                    return TRUE;
+               }
+
+               return FALSE;
+            }
+            break;
+        case L2_MODE_UNKNOWN:
+            break;
+        default:
+            ;
+        return FALSE;
+
+    }
+}
+
+
+
+
+
+
+//floods pkt out of all interfaces which satisfy conditions in the fcn l2 switch send pkt out
+static bool_t l2_switch_flood_pkt_out(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size){
+
+
+
+    //need to create copy pkt so i can send it out of all interfaces
+    interface_t *oif = NULL;
+    unsigned int i=0;
+    char *pkt_copy = NULL;
+    char *temp_pkt = calloc(1, MAX_PACKET_BUFFER_SIZE);
+    pkt_copy = temp_pkt + MAX_PACKET_BUFFER_SIZE - pkt_size;
+
+    for(;i<MAX_INTF_PER_NODE;i++){
+        oif = nodee->intf[i];
+        if(!oif){
+            break;
+        }
+        if(oif == exempted_intf || IS_INTF_L3_MODE(oif)){
+            continue;
+        }
+
+        //else send pkt out of this node interface
+        memcpy(pkt_copy,pkt,pkt_size);
+        l2_switch_send_pkt_out(pkt_copy,pkt_size,oif);
+
+    }
+    free(temp_pkt);
+
+}
+
+
+
+
+
+
 static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface, 
                                     char *pkt, unsigned int pkt_size){
     //purpose is to find the correct outgoing interface
@@ -135,7 +251,7 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
     //check if dest mac is broadcast address
     if(IS_MAC_BROADCAST_ADR(ethernet_hdr->dst_mac.mac)){
         //flood out of all l2 interfaces except current one
-        send_pkt_flood_l2_intf_only(node, recv_intf, pkt, pkt_size);
+        l2_switch_flood_pkt_out(node, recv_interface, (char *)ethernet_hdr, pkt_size);
     }
 
     //now do mac table lookup
@@ -143,7 +259,7 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
 
     //if no match found flood pkt 
     if(!mac_table_entry){
-        send_plt_flood_l2_intf_only(node, recv_intf, pkt, pkt_size);
+        l2_switch_flood_pkt_out(node, recv_interface, (char *)ethernet_hdr, pkt_size);
     }
 
     //if match found send packet out of specific interface
@@ -154,7 +270,7 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
         return;
     }
     //send pkt 
-    send_pkt_out(pkt,pkt_size,oif);
+    l2_switch_send_pkt_out((char *)ethernet_hdr,pkt_size,oif);
 
 }
 

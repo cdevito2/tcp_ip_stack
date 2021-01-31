@@ -150,31 +150,102 @@ static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_s
 
 
 //static function to decide whether routing device should accept or reject incoming packet
-static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, ethernet_hdr_t *ethernet_hdr){
-    //check if interface IP address has ip address, if not return false straight away
-    //if above passes, check if the interface mac address is equal to the ethernet header dest mac addr, if it is then return true
-    //if the above fails, also check if the dest mac is the broadcast mac, and return true
-    //return false otherwise
+static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, ethernet_hdr_t *ethernet_hdr, unsigned int *output_vlan_id){
 
-    //first check for ip addr
-    if(!IS_INTF_L3_MODE(interface)){
+
+    vlan_8021q_hdr_t *vlan_8021q_hdr = is_pkt_vlan_tagged(ethernet_hdr);
+    
+    //case where interface is not L3 or L2 mode, reject pkt
+    if(!IS_INTF_L3_MODE(interface) && IF_L2_MODE(interface)==UNKNOWN){
         return FALSE;
     }
-    //second check comparing dest mac address to interface mac address
-    //memcmp compares binary byte buffers we we must use this, must compare size of ethernet header mac address bytes to ensure they are a match
-    if(memcmp(IF_MAC(interface),ethernet_hdr->dst_mac.mac,sizeof(mac_add_t)) == 0){
-        //if returns 0 they are the same
-        return TRUE;
+
+    //case where interface in L3 mode and pkt is vlan tagged, drop pkt
+    if(IS_INTF_L3_MODE(interface) && vlan_8021q_hdr){
+        return FALSE;
     }
-    
-    
-    
-    //third check see if dest mac is broadcast address
-    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
+
+    //case where interface in L3 mode and dest mac is broadcast, accept it
+    if(IS_INTF_L3_MODE(interface) && IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
         return TRUE;
     }
 
-    return FALSE;
+    //case where interface is L3 mode and interface mac == dest mac
+    if(IS_INTF_L3_MODE(INTERFACE) && memcmp(IF_MAC(interface), ethernet_hdr->dst_mac.mac, sizeof(mac_add_t))){
+        return TRUE;
+    }
+
+
+    //case where interface is L2 MODE + access but not in a VLAN
+    if(IF_L2_MODE(interface) == ACCESS && get_access_intf_operating_vlan_id(interface) == 0){
+        //case 3 - recv untagged frame, accept
+        if(!vlan_8021q_hdr){
+            return TRUE;
+        }
+        else{
+            //recv tagged frame, reject - case 4
+            return FALSE;
+        }
+    }
+
+
+    *output_vlan_id = 0;
+    unsigned int intf_vlan_id =0;
+    unsigned int pkt_vlan_id =0;
+    //case where interface is L2 MODE + access and in a vlan
+    if(IF_L2_MODE(interface) == ACCESS){
+        intf_vlan_id = get_access_intf_operating_vlan_id(interface);
+        
+        
+        //case 3 - if pkt not tagged and switch not in vlan
+        if(!intf_vlan_id && ! vlan_8021_hdr){
+            return TRUE;
+        }
+
+
+        //case 6 - switch in vlan but pkt not tagged, accept
+        if(intf_vlan_id && !vlan_8021_hdr){
+            output_vlan_id = intf_vlan_id;//tag frame with this vlan id
+            return TRUE;
+        }
+        
+        
+        
+        
+        //if pkt vlan id = intf vlan id accept frame, else reject - case 5
+        pkt_vlan_id = GET_8021Q_VLAN_ID(vlan_8021q_hdr);
+        if(pkt_vlan_id == intf_vlan_id){
+            return TRUE;
+        }
+        else{
+            return FALSE;
+        }
+
+
+    }
+   
+    //case 7 and 8 - switch in trunk mode but recv untagged frame
+    if(IF_L2_MODE(interface) == TRUNK){
+        if(!vlan_8021q_hdr){
+            return FALSE;
+        }
+    }
+
+
+    //case 9
+    if(IF_L2_MODE(interface) == TRUNK && vlan_8021q_hdr){
+        //accept if pkt vlan id is configured on interface, else drop pkt
+        pkt_vlan_id = GET_8021Q_VLAN_ID(vlan_8021q_hdr);
+        if(is_trunk_interface_vlan_enabled(interface, pkt_vlan_id){
+            return TRUE;
+        }
+        else{
+            return FALSE;
+        }
+    }
+
+    
+    
 
 }
 

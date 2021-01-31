@@ -302,35 +302,6 @@ int send_pkt_flood(node_t *node, interface_t *exempted_intf, char *pkt, unsigned
 
 
 
-/* This function floods a packet out of all L2 interfaces
- * Args:
- *      node(node_t): the node of which to send the pkt out of its interfaces
- *      exepted_intf(interface_t): the interface which received the pkt, dont need to send it bal
- *      pkt(char *): the packet to flood out of the interfaces
- *      pkt_size(unsigned int): the size of the packet 
- *
- * Returns:
- *           */
-
-int send_pkt_flood_l2_intf_only(node_t *node, interface_t *exempted_intf, char *pkt, unsigned int pkt_size){
-    unsigned int i=0;
-    interface_t *intf;
-    for(i=0;i<MAX_INTF_PER_NODE;i++){
-        intf = node->intf[i];
-        if(!intf){return 0;}
-        
-        //check that the interface is not the one that pkt recv from and check that its L2
-        if(intf == exempted_intf || !INTF_L2_MODE(intf)){
-            continue;
-        }
-        //if we reach here we are an l2 interface 
-        send_pkt_out(pkt,pkt_size,intf);
-    }
-}
-
-
-
-
 
 
 void network_start_pkt_receiver_thread(graph_t *topo){

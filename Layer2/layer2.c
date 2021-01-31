@@ -238,6 +238,15 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
     send_arp_reply_msg(ethernet_hdr, iif);
 }
 
+
+
+
+
+
+
+
+
+
 static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
     //make entry into arp table
     //invoked by node when node recv msg
@@ -246,15 +255,34 @@ static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t
     arp_table_update_from_arp_reply(NODE_ARP_TABLE(node),(arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),iif);
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
 void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
+    
     //first header is ethernet header
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    unsigned int vlan_id_to_tag =0;
     //check things to see if packet can be processed
-    if(l2_frame_recv_qualify_on_interface(interface, ethernet_hdr) == FALSE){
+    if(l2_frame_recv_qualify_on_interface(interface, ethernet_hdr,&vlan_id_to_tag) == FALSE){
         printf("L2 Frame rejected");
         return;
     }
+    
+    
     printf("L2 Frame accepted\n");
+
+    //pkt has passed all test cases in the qualify function
+
 
     //deside what to do with packet based on type field
     if(IS_INTF_L3_MODE(interface)){
@@ -285,7 +313,14 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
     }
     else if(IF_L2_MODE(interface) == ACCESS || IF_L2_MODE(interface) == TRUNK){
         //l2 switch received
-        l2_switch_recv_frame(interface, pkt, pkt_size);
+        
+        //check if frame needs to be tagged
+        unsigned int new_pkt_size =0;
+        if(vlan_id_to_tag){
+            pkt = (char *)tag_pkt_with_vlan_id((ethernet_hdr_t *)pkt, pkt_size, vlan_id_to_tag, &new_pkt_size)
+
+        }
+        l2_switch_recv_frame(interface, pkt, vlan_id_to_tag ? new_pkt_size : pkt_size);
     }
     else{
         //do nothing

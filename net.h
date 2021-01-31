@@ -146,4 +146,6 @@ bool_t node_unset_intf_ip_address(node_t *node, char *local_if);
 void interface_assign_mac_address(interface_t *interface);
 void dump_nw_graph(graph_t *graph);
 char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int total_buffer_size);
+unsigned int get_access_intf_operation_vlan_id(interface_t *interface);
+bool_t is_trunk_interface_vlan_enabled(interface_t *interface, unsigned int vlan_id);
 #endif
