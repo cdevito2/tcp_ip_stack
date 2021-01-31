@@ -54,17 +54,17 @@ typedef struct arp_hdr_{
  /*  VLAN SUPPORT STRUCTURES */
 
 //4 byte vlan header
- typedef struct vlan_8021q_hdr_{
+typedef struct vlan_8021q_hdr_{
     unsigned short tpid; // set to 0x8100
     short tci_pcp : 3;  //3 bits, not using
     short tci_dei : 1; //1 bit, not using
     short tci_vid : 12; //12 bits. vlan id
- }
+} vlan_8021q_hdr_t;
 
 
 typedef struct vlan_ethernet_hdr_{
     mac_add_t dst_mac;
-    mac_add_t src_mac;i
+    mac_add_t src_mac;
     vlan_8021q_hdr_t vlan_8021q_hdr;
     unsigned short type;
     char payload[248];
@@ -95,6 +95,34 @@ GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 
 
 
+
+/*  This function takes in an ethernet frame and determines if it is tagged or not */
+/*  Returns NULL if frame not tagges, pointer to vlan hdr if it is tagged */
+static inline vlan_8021q_hdr_t *is_pkt_vlan_tagged(ethernet_hdr_t *ethernet_hdr){
+    //13th and 14th byte in the vlan tagged and non vlan tagged eth hdr
+    if(ethernet_hdr->type == VLAN_8021Q_PROTO){
+        return (vlan_8021q_hdr_t *)&(ethernet_hdr->type); //return pointer to the vlan tagged hdr
+    }
+    else{
+        return NULL; //untagged frame
+    }
+}
+
+
+
+
+
+//This function returns the VLAN ID present in the vlan tagged ethernet frame
+static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
+    return (unsigned int)(vlan_8021q_hdr->tci_vid);
+}
+
+
+
+
+
+
+
 //MACRO DEFINED TO EVALUATE THE SIZE OF THE ETHERNET HEADER EXCLUDING THE PAYLOAD
 //what this does is it gets the size of the entire ethernet header struct and subtracts the payload size and returns
 #define ETH_HDR_SIZE_EXCL_PAYLOAD   \
@@ -104,7 +132,7 @@ GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
 
 
 #define VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD  \
-    (sizeof(vlan_ethernet_hdr_t) - sizeof(((vlan_etherent_hdr_t *)0)->payload))
+    (sizeof(vlan_ethernet_hdr_t) - sizeof(((vlan_ethernet_hdr_t *)0)->payload))
 
 
 
@@ -128,6 +156,22 @@ GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
         ETH_FCS(eth_hdr_ptr,payload_size))
 
 
+
+/*  This function sets the FCS value of an untagged or a tagged eth frame */
+static inline void SET_COMMON_ETH_FCS(ethernet_hdr_t *ethernet_hdr, unsigned int payload_size, unsigned int new_fcs){
+
+    if(is_pkt_vlan_tagged(ethernet_hdr)){ //check if tagged
+        VLAN_ETH_FCS(ethernet_hdr,payload_size) = new_fcs;
+    }
+    else{
+        ETH_FCS(ethernet_hdr,payload_size) = new_fcs;
+    }
+}
+
+
+
+
+
 //static function to allocate ethernet header with payload packet
 static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
     //must encapsulate data into payload of ethernet header
@@ -137,14 +181,14 @@ static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_s
     memcpy(temp,pkt,pkt_size);
 
     ethernet_hdr_t *header = (ethernet_hdr_t *)(pkt - ETH_HDR_SIZE_EXCL_PAYLOAD);
-    memset((char *)header,0,ETH_HDR_SIZE_EXCL_PAYLOAD)
+    memset((char *)header,0,ETH_HDR_SIZE_EXCL_PAYLOAD);
     //header is now pointing to where the payload data should be written to in the ethernet header
     memset(header,0,ETH_HDR_SIZE_EXCL_PAYLOAD);
     //above line sets all fields before the payload to be zero
     memcpy(header->payload,temp,pkt_size);
     free(temp);
     //set the FCS to be zero
-    SET_COMMON_ETH_FCS(header,pkt_size) = 0;    
+    SET_COMMON_ETH_FCS(header,pkt_size, 0);    
 
 }
 
@@ -156,7 +200,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     vlan_8021q_hdr_t *vlan_8021q_hdr = is_pkt_vlan_tagged(ethernet_hdr);
     
     //case where interface is not L3 or L2 mode, reject pkt
-    if(!IS_INTF_L3_MODE(interface) && IF_L2_MODE(interface)==UNKNOWN){
+    if(!IS_INTF_L3_MODE(interface) && IF_L2_MODE(interface)==L2_MODE_UNKNOWN){
         return FALSE;
     }
 
@@ -171,7 +215,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     }
 
     //case where interface is L3 mode and interface mac == dest mac
-    if(IS_INTF_L3_MODE(INTERFACE) && memcmp(IF_MAC(interface), ethernet_hdr->dst_mac.mac, sizeof(mac_add_t))){
+    if(IS_INTF_L3_MODE(interface) && memcmp(IF_MAC(interface), ethernet_hdr->dst_mac.mac, sizeof(mac_add_t))){
         return TRUE;
     }
 
@@ -198,13 +242,13 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
         
         
         //case 3 - if pkt not tagged and switch not in vlan
-        if(!intf_vlan_id && ! vlan_8021_hdr){
+        if(!intf_vlan_id && ! vlan_8021q_hdr){
             return TRUE;
         }
 
 
         //case 6 - switch in vlan but pkt not tagged, accept
-        if(intf_vlan_id && !vlan_8021_hdr){
+        if(intf_vlan_id && !vlan_8021q_hdr){
             output_vlan_id = intf_vlan_id;//tag frame with this vlan id
             return TRUE;
         }
@@ -236,7 +280,7 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
     if(IF_L2_MODE(interface) == TRUNK && vlan_8021q_hdr){
         //accept if pkt vlan id is configured on interface, else drop pkt
         pkt_vlan_id = GET_8021Q_VLAN_ID(vlan_8021q_hdr);
-        if(is_trunk_interface_vlan_enabled(interface, pkt_vlan_id){
+        if(is_trunk_interface_vlan_enabled(interface, pkt_vlan_id)){
             return TRUE;
         }
         else{
@@ -252,27 +296,11 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
 
 
 
-/*  This function takes in an ethernet frame and determines if it is tagged or not */
-/*  Returns NULL if frame not tagges, pointer to vlan hdr if it is tagged */
-static inline vlan_8021q_hdr_t *is_pkt_vlan_tagged(ethernet_hdr_t *ethernet_hdr){
-    //13th and 14th byte in the vlan tagged and non vlan tagged eth hdr
-    if(ethernet_hdr->type == 0x8100){
-        return (vlan_8021q_hdr_t *)&(ethernet_hdr->type); //return pointer to the vlan tagged hdr
-    }
-    else{
-        return NULL; //untagged frame
-    }
-}
 
 
 
 
 
-
-//This function returns the VLAN ID present in the vlan tagged ethernet frame
-static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
-    return (unsigned int)(vlan_8021q_hdr->tcp_vid);
-}
 
 
 
@@ -280,7 +308,7 @@ static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
 
 /*  This function returns the pointer to the start of the payload for a tagged or untagged ethernet hdr frame */
 static inline char * GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_t *ethernet_hdr){
-    if(is_pkt_vlan_tagged(ethernet_hdr){ //check if its tagged
+    if(is_pkt_vlan_tagged(ethernet_hdr)){ //check if its tagged
         (vlan_ethernet_hdr_t *)ethernet_hdr;
         return ethernet_hdr->payload;
     }
@@ -290,16 +318,6 @@ static inline char * GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_t *ethernet_hdr){
 }
 
 
-/*  This function sets the FCS value of an untagged or a tagged eth frame */
-static inline void SET_COMMON_ETH_FCS(ethernet_hdr_t *ethernet_hdr, unsigned int payload_size, unsigned int new_fcs){
-
-    if(is_pkt_vlan_tagged(ethernet_hdr)){ //check if tagged
-        VLAN_ETH_FCS(ethernet_hdr,payload_size) = new_fcs;
-    }
-    else{
-        ETH_FCS(Ethernet_hdr,payload_size) = new_fcs;
-    }
-}
 
 
 
@@ -327,7 +345,7 @@ ethernet_hdr_t *untag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned in
 
 
 void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2_mode);
-void node_set_intf_vlan_membership(node_t *node, char *intf_name unsigned int vlan_id);
+void node_set_intf_vlan_membership(node_t *node, char *intf_name, unsigned int vlan_id);
 
 
 

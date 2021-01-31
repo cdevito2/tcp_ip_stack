@@ -317,7 +317,7 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
         //check if frame needs to be tagged
         unsigned int new_pkt_size =0;
         if(vlan_id_to_tag){
-            pkt = (char *)tag_pkt_with_vlan_id((ethernet_hdr_t *)pkt, pkt_size, vlan_id_to_tag, &new_pkt_size)
+            pkt = (char *)tag_pkt_with_vlan_id((ethernet_hdr_t *)pkt, pkt_size, vlan_id_to_tag, &new_pkt_size);
 
         }
         l2_switch_recv_frame(interface, pkt, vlan_id_to_tag ? new_pkt_size : pkt_size);
@@ -460,7 +460,7 @@ void interface_set_l2_mode(node_t *node, interface_t *interface, char *l2_mode_o
 
 
 
-ethernet_hdr_t *tag_pkt_with_vlan_id(etherent_hdr_t *etherent_hdr, unsigned int total_pkt_size, int vlan_id, unsigned int *new_pkt_size){
+ethernet_hdr_t * tag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned int total_pkt_size, int vlan_id, unsigned int *new_pkt_size){
     //check if its already tagged, if it is, update the vlan id
 
     vlan_8021q_hdr_t *vlan_8021q_hdr = is_pkt_vlan_tagged(ethernet_hdr);
@@ -468,13 +468,14 @@ ethernet_hdr_t *tag_pkt_with_vlan_id(etherent_hdr_t *etherent_hdr, unsigned int 
     *new_pkt_size=0;
 
     if(vlan_8021q_hdr){
-        //pkt is already tagged so replace the vlan id 
         payload_size = total_pkt_size - VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD;
-        vlan_8021q_hdr->tci_vid = short(vlan_id);
-        //update checksum
-        SET_COMMON_ETH_FCS(ethernet_hdr,payload_size,0);
+        vlan_8021q_hdr->tci_vid = (short)vlan_id;
+        
+        /*Update checksum, however not used*/
+        SET_COMMON_ETH_FCS(ethernet_hdr, payload_size, 0);
+
         *new_pkt_size = total_pkt_size;
-        return etherent_hdr;
+        return ethernet_hdr;
     }
     
     
@@ -486,15 +487,15 @@ ethernet_hdr_t *tag_pkt_with_vlan_id(etherent_hdr_t *etherent_hdr, unsigned int 
     total_pkt_size = ETH_HDR_SIZE_EXCL_PAYLOAD;
     //shift pkt pointer to the left by creating space size of vlan 8021q hdr
     
-    vlan_ethernet_hdr_t *vlan_ethernet_hdr = (vlan_ethernet_hdr_t *)((char *)etherent_hdr - sizeof(vlan_8021q_hdr_t));
+    vlan_ethernet_hdr_t *vlan_ethernet_hdr = (vlan_ethernet_hdr_t *)((char *)ethernet_hdr - sizeof(vlan_8021q_hdr_t));
     //init pkt buffer with 0, except payload
     
     memset((char *)vlan_ethernet_hdr,0,VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(vlan_ethernet_hdr->FCS));
 
     //fill fields by copying from temp memory
     
-    memcpy(vlan_ethernet_hdr->dst_mac.mac, ethernet_hdr_old->dst_mac.mac,sizeof(mac_add_t));
-    memcpy(vlan_ethernet_hdr->dst_mac.mac, ethernet_hdr_old->dst_mac.mac,sizeof(mac_add_t));
+    memcpy(vlan_ethernet_hdr->dst_mac.mac, ethernet_hdr_old.dst_mac.mac,sizeof(mac_add_t));
+    memcpy(vlan_ethernet_hdr->dst_mac.mac, ethernet_hdr_old.dst_mac.mac,sizeof(mac_add_t));
      
     //update 8021q hdr
     vlan_ethernet_hdr->vlan_8021q_hdr.tpid = VLAN_8021Q_PROTO;
@@ -517,7 +518,7 @@ ethernet_hdr_t *untag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned in
     //if already untagged, do nothing
 
     *new_pkt_size =0;
-    vlan_8021_hdr_t *vlan_8021_hdr = is_pkt_vlan_tagged(ethernet_hdr);
+    vlan_8021q_hdr_t *vlan_8021q_hdr = is_pkt_vlan_tagged(ethernet_hdr);
     if(!vlan_8021q_hdr){
         *new_pkt_size = total_pkt_size;
         return ethernet_hdr;
@@ -527,7 +528,7 @@ ethernet_hdr_t *untag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr, unsigned in
     vlan_ethernet_hdr_t vlan_ethernet_hdr_old;
 
     //copy vlan tagged hdr temp memory from start of buffer to beginning of payload
-    memcpy((char *)vlan_ethernet_hdr_old, (char *)ethernet_hdr, VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(vlan_etherner_hdr_old.FCS));
+    memcpy((char *)&vlan_ethernet_hdr_old, (char *)ethernet_hdr, VLAN_ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(vlan_ethernet_hdr_old.FCS));
 
     ethernet_hdr = (ethernet_hdr_t *)((char *)ethernet_hdr + sizeof(vlan_8021q_hdr_t));
 
