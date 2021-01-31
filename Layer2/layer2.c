@@ -41,13 +41,27 @@ arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr){
     arp_entry_t *arp_entry;
     ITERATE_GLTHREAD_BEGIN(&arp_table->arp_entries,curr){
         //for each entry compare the key of entry to the ip passed as argument
-        arp_entry = graph_glue_to_arp_entry(curr);
+        arp_entry = arp_glue_to_arp_entry(curr);
         if(strncmp(arp_entry->ip_addr.ip_addr,ip_addr,16) == 0){
             return arp_entry; 
         }
     }ITERATE_GLTHREAD_END(&arp_table->arp_entries,curr);
     return NULL;
 }
+
+
+
+
+void delete_arp_entry(arp_entry_t *arp_entry){
+    //glthread_t *curr;
+    //remove_glthread(arp_entry->arp_glue);
+    //free(arp_entry);
+}
+
+
+
+
+
 
 /* TODO: FIX THIS AND THE HELPER FUNCTION */
 void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr){
@@ -306,8 +320,8 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
             break;
             default:
                 //assume ip packet
-                //promote to layer3
-                promote_pkt_to_layer3(node, interface, pkt, pkt_size);
+                //promote to layer3 - todo implement 
+               // promote_pkt_to_layer3(node, interface, pkt, pkt_size);
                 break;
         }
     }

@@ -21,6 +21,7 @@
 #include "../graph.h"
 #include "layer2.h"
 #include "../gluethread/glthread.h"
+#include "comm.h"
 
 typedef struct mac_table_entry_{
     mac_add_t mac;//key
@@ -40,6 +41,68 @@ typedef struct mac_table_{
 
 /*  CRUD APIs for MAC TABLE */
 
+
+
+
+//Initialize
+void init_mac_table(mac_table_t **mac_table){
+    //calloc mem space
+    *mac_table = calloc(1, sizeof(mac_table_t));
+    //init the linked list
+    init_glthread(&((*mac_table)->mac_entries));
+}
+
+
+
+
+
+
+//Replace
+mac_table_entry_t *mac_table_lookup(mac_table_t *mac_table, char *mac){
+    //iterate through mac table linked list
+    glthread_t *curr;
+    mac_table_entry_t *mac_table_entry;
+
+    ITERATE_GLTHREAD_BEGIN(&mac_table->mac_entries, curr){
+        //get the entry from the glthread
+        mac_table_entry = mac_entry_glue_to_mac_entry(curr);
+        //compare the mac address of the entry to the function argument
+        if(strncmp(mac_table_entry->mac.mac,mac,sizeof(mac_add_t)) == 0){
+            //found a match
+            return mac_table_entry;
+        }
+    }ITERATE_GLTHREAD_END(&mac_table->mac_entries,curr);
+    return NULL;
+
+}
+
+
+
+
+
+//Delete
+void delete_mac_table_entry(mac_table_t *mac_table, char *mac){
+    //find the entry in the mac table using lookup function
+    mac_table_entry_t *mac_table_entry;
+    mac_table_entry = mac_table_lookup(mac_table, mac);
+    //if it didnt find the entry return 
+    if(!mac_table_entry){
+        return;
+    }
+    //we found a match so delete it
+    //remove from the linked list of mac table
+    remove_glthread(&mac_table_entry->mac_entry_glue);
+    //free the memory
+    free(mac_table_entry);
+
+
+}
+
+
+
+
+
+
 //Create or Update
  
 bool_t mac_table_entry_add(mac_table_t *mac_table, mac_table_entry_t *mac_table_entry){
@@ -47,7 +110,7 @@ bool_t mac_table_entry_add(mac_table_t *mac_table, mac_table_entry_t *mac_table_
     mac_table_entry_t *old_entry = mac_table_lookup(mac_table, mac_table_entry->mac.mac);
     //if they are equal do not update
     if(old_entry && IS_MAC_TABLE_ENTRY_EQUAL(old_entry, mac_table_entry)){
-        return FALSE'
+        return FALSE;
     }
     //if exists but not equal delete old entry
     if(old_entry){
@@ -61,51 +124,12 @@ bool_t mac_table_entry_add(mac_table_t *mac_table, mac_table_entry_t *mac_table_
     glthread_add_next(&mac_table->mac_entries, &mac_table_entry->mac_entry_glue);
 }
 
-//Replace
-mac_table_entry_t *mac_table_lookup(mac_table_t *mac_table, char *mac){
-    //iterate through mac table linked list
-    glthread_t *curr;
-    mac_table_entry_t *mac_table_entry;
-
-    ITERATE_GLTHREAD_BEGIN(&mac_table->mac_entries, curr){
-        //get the entry from the glthread
-        mac_table_entry = mac_entry_glue_to_mac_entry(curr)
-        //compare the mac address of the entry to the function argument
-        if(strncmp(mac_table_entry->mac.mac,mac,sizeof(mac_add_t)) == 0){
-            //found a match
-            return mac_table_entry;
-        }
-    }ITERATE_GLTHREAD_END(&mac_table->mac_entries,curr);
-    return NULL;
-
-}
-
-//Delete
-void delete_mac_table_entry(mac_table_t *mac_table, char *mac){
-    //find the entry in the mac table using lookup function
-    mac_table_entry_t *mac_table_entry;
-    mac_table_entry = mac_table_lookup(mac_table, mac);
-    //if it didnt find the entry return 
-    if(!mac_table_entry){
-        return;
-    }
-    //we found a match so delete it
-    //remove from the linked list of mac table
-    remove_glthread(&mac_table_entry->mac_table_glue);
-    //free the memory
-    free(mac_table_entry);
 
 
-}
 
 
-//Initialize
-void init_mac_table(mac_table_t **mac_table){
-    //calloc mem space
-    *mac_table = calloc(1, sizeof(mac_table_t));
-    //init the linked list
-    init_glthread(&((*mac_table)->mac_entries));
-}
+
+
 
 
 static void l2_switch_perform_mac_learning(node_t *node, char *src_mac, char *if_name){
@@ -137,7 +161,7 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
     intf_l2_mode_t intf_l2_mode = IF_L2_MODE(oif);
 
     //case 6 unknown l2 mode
-    if(intf_l2_mode == UNKNOWN){
+    if(intf_l2_mode == L2_MODE_UNKNOWN){
         return FALSE;
     }
 
@@ -151,7 +175,7 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
                 unsigned int intf_vlan_id = get_access_intf_operating_vlan_id(oif);
             
                 //case 1 - not vlan enabled and pkt is not tagged, simply forward it
-                if(!intf_Vlan_id && !vlan_8021q_hdr){
+                if(!intf_vlan_id && !vlan_8021q_hdr){
                     send_pkt_out(pkt,pkt_size, oif);
                     return TRUE;
                 }
@@ -168,7 +192,7 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
 
 
                 //case 5 - pkt is tagged and interface vlan enabled and the vlan id match
-                if(vlan_8021q_hdr && (intf_vlan_id == GET_802_1Q_VLAN_ID(vlan_8021q_hdr))){
+                if(vlan_8021q_hdr && (intf_vlan_id == GET_8021Q_VLAN_ID(vlan_8021q_hdr))){
                     //l2 switch untaggs frame here
                     unsigned int *new_pkt_size = 0;
                     ethernet_hdr = untag_pkt_with_vlan_id(ethernet_hdr, pkt_size, &new_pkt_size);
@@ -183,7 +207,7 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
                //pkt taggeed, int trunk mode, vlan match , l2 switch forward
                unsigned int pkt_vlan_id=0;
                if(vlan_8021q_hdr){
-                   pkt_vlan_id = GET_802_1Q_VLAN_ID(vlan_8021q_hdr);
+                   pkt_vlan_id = GET_8021Q_VLAN_ID(vlan_8021q_hdr);
                }
 
                if(pkt_vlan_id && is_trunk_interface_vlan_enabled(oif,pkt_vlan_id)){
@@ -221,7 +245,7 @@ static bool_t l2_switch_flood_pkt_out(node_t *node, interface_t *exempted_intf, 
     pkt_copy = temp_pkt + MAX_PACKET_BUFFER_SIZE - pkt_size;
 
     for(;i<MAX_INTF_PER_NODE;i++){
-        oif = nodee->intf[i];
+        oif = node->intf[i];
         if(!oif){
             break;
         }
@@ -249,7 +273,7 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
     //todo this we do a mac lookup with the key being the destination mac address
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
     //check if dest mac is broadcast address
-    if(IS_MAC_BROADCAST_ADR(ethernet_hdr->dst_mac.mac)){
+    if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
         //flood out of all l2 interfaces except current one
         l2_switch_flood_pkt_out(node, recv_interface, (char *)ethernet_hdr, pkt_size);
     }
