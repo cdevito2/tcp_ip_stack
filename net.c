@@ -15,18 +15,41 @@
  *
  * =====================================================================================
  */
-#include "net.h"
+#include <netinet/in.h>
 #include "graph.h"
 #include <stdio.h>
 #include "utils.h"
 #include <stdlib.h>
-#include <netinet/in.h>
+#include <memory.h>
+/*Just some Random number generator*/
+static unsigned int
+hash_code(void *ptr, unsigned int size){
+    unsigned int value=0, i =0;
+    char *str = (char*)ptr;
+    while(i < size)
+    {
+        value += *str;
+        value*=97;
+        str++;
+        i++;
+    }
+    return value;
+}
 
-void interface_assign_mac_address(interface_t *interface){
-    //assigne mac address to a given mac address
-    memset(IF_MAC(interface),0,48);
-    strcpy(IF_MAC(interface),interface->att_node->node_name);
-    strcat(IF_MAC(interface),interface->if_name);
+
+/*Heuristics, Assign a unique mac address to interface*/
+void
+interface_assign_mac_address(interface_t *interface){
+    node_t *node = interface->att_node; 
+    if(!node)
+        return;
+    /*  ISSUE HERE WITH MAC ADDRESS CHRIS */
+    unsigned int hash_code_val = 0;
+    hash_code_val = hash_code(node->node_name, NODE_NAME_SIZE);
+    hash_code_val *= hash_code(interface->if_name, IF_NAME_SIZE);
+    memset(IF_MAC(interface), 0, sizeof(IF_MAC(interface)));
+    memcpy(IF_MAC(interface), (char *)&hash_code_val, sizeof(unsigned int));
+
 }
 
 
@@ -83,13 +106,16 @@ void dump_intf_props(interface_t *interface){
     dump_interface(interface);
     if(interface->intf_nw_props.is_ipadd_config){
         printf("\t IP ADDR = %s/%u",IF_IP(interface),interface->intf_nw_props.mask);
+
+        printf("\t MAC : %u:%u:%u:%u:%u:%u\n", 
+                IF_MAC(interface)[0], IF_MAC(interface)[1],
+                IF_MAC(interface)[2], IF_MAC(interface)[3],
+                IF_MAC(interface)[4], IF_MAC(interface)[5]);
     }
     else{
         printf("\t IP ADDR = %s/%u","Nil",0);
     }
 
-    //now print mac addresses
-    printf("\t MAC: %u:%u:%u:%u:%u:%u\n",IF_MAC(interface)[0],IF_MAC(interface)[1],IF_MAC(interface)[3],IF_MAC(interface)[4],IF_MAC(interface)[5]);
 
 }
 
@@ -159,17 +185,22 @@ char * pkt_buffer_shift_right(char *pkt, unsigned int pkt_size, unsigned int tot
     //note that totalbuffersize is MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE
     char *temp = NULL;
     bool_t need_temp_memory = FALSE;
-    if(pkt_size *2 > total_buffer_size){
+    if(pkt_size * 2 > total_buffer_size){
         need_temp_memory = TRUE;
     }
     
-
     if(need_temp_memory){
-        temp = calloc(1,pkt_size);
-        memcpy(temp,pkt,pkt_size);
-        memset(pkt,0,total_buffer_size);
-
+        temp = calloc(1, pkt_size);
+        memcpy(temp, pkt, pkt_size);
+        memset(pkt, 0, total_buffer_size);
+        memcpy(pkt + (total_buffer_size - pkt_size), temp, pkt_size);
+        free(temp);
+        return pkt + (total_buffer_size - pkt_size);
     }
+    
+    memcpy(pkt + (total_buffer_size - pkt_size), pkt, pkt_size);
+    memset(pkt, 0, pkt_size);
+    return pkt + (total_buffer_size - pkt_size);
 }
 
 

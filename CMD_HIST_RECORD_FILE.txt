@@ -1,0 +1,127 @@
+?
+?
+show topo
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+show topo
+show node H1 arp
+run node H1 resolve-arp 20.1.1.1
+run node H1 resolve-arp 10.1.1.2
+run node H1 resolve-arp 20.1.1.2
+run node H1 resolve-arp 10.1.1.2
+show topo
+run node H1 resolve-arp 10.1.1.2
+show topo
+show topo
+show topo
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show topo
+show topo
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show topo
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+run node R0_re resolve-arp 20.1.1.2
+show node R0_re arp
+show topo
+run node R0_re resolve-arp 20.1.1.2

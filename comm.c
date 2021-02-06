@@ -29,11 +29,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <netdb.h>
+#include "Layer2/layer2.h"
+#include "net.h"
 
-
-
-static char send_buffer[MAX_PACKET_BUFFER_SIZE];
-static char recv_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
 static unsigned int udp_port_number = 40000;
 
 
@@ -58,8 +56,8 @@ static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, uns
     dest_addr.sin_port = dst_udp_port_no;
     struct hostent *host = (struct hostent *)gethostbyname("127.0.0.1");
     dest_addr.sin_addr = *((struct in_addr *)host->h_addr);
-    printf("PORT : %d\n",dest_addr.sin_port);
     //now we have defined the dest address now send, note function that calls this function has opened a socket already
+    printf("In _send_pkt_out function\n");
     rc = sendto(sock_fd,pkt_data,pkt_size,0,(struct sockaddr *)&dest_addr, sizeof(struct sockaddr));
     return rc;
 
@@ -77,7 +75,10 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
     if(!recv_intf){
         printf("Error: Pkt received on unknown unterface %s on node %s\n",recv_intf->if_name,receiving_node->node_name);
     }
-
+    printf("PKT RECV ON %s\n",recv_intf->if_name);
+    printf("In _pkt_receive fcn\n");
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)(pkt_with_aux_data+IF_NAME_SIZE);
+    printf("IN FIRST PKT RECV FUNCTION ETH TYPE : %u\n",ethernet_hdr->type);
     //invoke call to receive packet
     //note that pkt_with_aux_data right+shitfs the packet pointer to the start of data
     pkt_receive(receiving_node,recv_intf,pkt_with_aux_data+IF_NAME_SIZE,pkt_size - IF_NAME_SIZE);
@@ -104,6 +105,8 @@ extern void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, u
 
 
 
+static char recv_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
+static char send_buffer[MAX_PACKET_BUFFER_SIZE];//portion of memory used to receive data
 
 /*  This funciton is called when an interface receives a packet
  *  Flow:
@@ -119,10 +122,13 @@ extern void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, u
 int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
     //entry point into link layer
     //ingress journey of packet starts from here in the TCP IP stack
-    printf("msg recvd = %s, on node = %s,  IIF= %s\n",pkt, node->node_name, interface->if_name);
     //here we perform a right shift to the packet pointer to the right boundary, right before the pkt data, note previously it was pointing to the beginning of data but we need to add space before it
+    ethernet_hdr_t *eth = (ethernet_hdr_t *)pkt;
+    printf("ETH TYPE BEFORE PKT SHIFT : %u\n",eth->type);
     pkt = pkt_buffer_shift_right(pkt,pkt_size, MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE);
-
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    printf("ETH TYPE IN PKT RECEIVE %u\n",ethernet_hdr->type); 
+    printf("In pkt_receive funciton, sending to layer2_frame recv\n");
     //further processing of packet
     ///*  THIS FUNCTION IS THE ENTRY POINT INTO THE TCP IP STACK FROM THE BOTTOM! */
     //note that packet pointer at this point is pointing to the data in the already right shifted packet buffer 
@@ -134,7 +140,56 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
 
 
 
+int
+send_pkt_out(char *pkt, unsigned int pkt_size, 
+             interface_t *interface){
 
+    int rc = 0;
+    node_t *sending_node = interface->att_node;
+    node_t *nbr_node = get_nbr_node(interface);
+    
+    if(!nbr_node)
+        return -1;
+
+    if(pkt_size + IF_NAME_SIZE > MAX_PACKET_BUFFER_SIZE){
+        printf("Error : Node :%s, Pkt Size exceeded\n", sending_node->node_name);
+        return -1;
+    }
+
+    unsigned int dst_udp_port_no = nbr_node->udp_port_number;
+    
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP );
+
+    if(sock < 0){
+        printf("Error : Sending socket Creation failed , errno = %d", errno);
+        return -1;
+    }
+    
+    interface_t *other_interface = &interface->link->intf1 == interface ? \
+                                    &interface->link->intf2 : &interface->link->intf1;
+
+    ethernet_hdr_t *ethhdr = (ethernet_hdr_t *)pkt;
+    printf("ETH HDR AT TOP OF SEND FCN : %u\n",ethhdr->type);
+    printf("PKT SIZE : %u\n",pkt_size);
+    memset(send_buffer, 0, MAX_PACKET_BUFFER_SIZE);
+
+    char *pkt_with_aux_data = send_buffer;
+    strncpy(pkt_with_aux_data, other_interface->if_name, IF_NAME_SIZE);
+
+    pkt_with_aux_data[IF_NAME_SIZE - 1] = '\0';
+
+    memcpy(pkt_with_aux_data + IF_NAME_SIZE, pkt, pkt_size);
+
+    ethernet_hdr_t *eth = (ethernet_hdr_t *)(pkt_with_aux_data + IF_NAME_SIZE);
+    printf("ETH HDR IN SEND PKT BEFORE _SEND : %u\n",eth->type);
+    rc = _send_pkt_out(sock, pkt_with_aux_data, pkt_size + IF_NAME_SIZE, 
+                        dst_udp_port_no);
+
+    close(sock);
+    return rc; 
+}
+
+/*  
 int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
     //3rd argument is local interface to send out
     node_t *sending_node = interface->att_node;
@@ -142,7 +197,8 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
     node_t *nbr_node = get_nbr_node(interface);
     //basic check ensure neightbour node exists
     if(!nbr_node){return -1;}
-
+    ethernet_hdr_t *ethernet_hdr =(ethernet_hdr_t *) pkt;
+    printf("ETH TYPE AT BEGGING OF SEND PKT FCN: %u\n",ethernet_hdr->type);
     //get destination port number
     unsigned int dest_udp_port = nbr_node->udp_port_number;
     //unsigned int dest_udp_port = 40001;
@@ -165,20 +221,21 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
     
     //add in receiving interface name
     strncpy(pkt_with_aux_data, recv_interface->if_name, IF_NAME_SIZE);
-
-    pkt_with_aux_data[IF_NAME_SIZE] = '\0';//escape char
+    pkt_with_aux_data[IF_NAME_SIZE - 1] = '\0';//escape char
 
     memcpy(pkt_with_aux_data + IF_NAME_SIZE, pkt,pkt_size);
 
     int rc =0;
-
+    printf("In send pkt out function\n");
+    ethernet_hdr_t *eth = (ethernet_hdr_t *)(pkt_with_aux_data + IF_NAME_SIZE);
+    printf("ETH HDR RIGHT BEFORE _SEND : %u\n",eth->type);
     rc = _send_pkt_out(sock, pkt_with_aux_data,pkt_size + IF_NAME_SIZE, dest_udp_port);
     close(sock);
     return rc;
 
 }
 
-
+*/
 
 
 
@@ -186,7 +243,6 @@ int send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *interface){
 void init_udp_socket(node_t *node){
     //assign udp port number and create socket
     node->udp_port_number = get_next_udp_port();
-    printf("UDP PORT FOR NODE IS: %d\n",node->udp_port_number);
     //create socket
 
     int udp_sock_fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
@@ -207,9 +263,6 @@ void init_udp_socket(node_t *node){
     node->udp_sock_fd = udp_sock_fd;
 
 }
-
-
-
 
 
 static void * _network_start_pkt_receiver_thread(void *arg){
@@ -272,6 +325,9 @@ static void * _network_start_pkt_receiver_thread(void *arg){
     }
 
 }
+
+
+
 
 
 

@@ -129,6 +129,65 @@ void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr,
 
 }
 
+
+/*A Routine to resolve ARP out of oif*/
+void
+send_arp_broadcast_request(node_t *node,
+                           interface_t *oif,
+                           char *ip_addr){
+
+    /*Take memory which can accomodate Ethernet hdr + ARP hdr*/
+    unsigned int payload_size = sizeof(arp_hdr_t);
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)calloc(1, 
+                ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size);
+
+    if(!oif){
+        oif = node_get_matching_subnet_interface(node, ip_addr);
+        if(!oif){
+            printf("Error : %s : No eligible subnet for ARP resolution for Ip-address : %s",
+                    node->node_name, ip_addr);
+            return;
+        }
+        if(strncmp(IF_IP(oif), ip_addr, 16) == 0){
+            printf("Error : %s : Attemp to resolve ARP for local Ip-address : %s",
+                    node->node_name, ip_addr);
+            return;
+        }
+    }
+    /*STEP 1 : Prepare ethernet hdr*/
+    layer2_fill_with_broadcast_mac(ethernet_hdr->dst_mac.mac);
+    memcpy(ethernet_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
+    ethernet_hdr->type = ARP_MSG;
+
+    /*Step 2 : Prepare ARP Broadcast Request Msg out of oif*/
+    arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
+    arp_hdr->hw_type = 1;
+    arp_hdr->proto_type = 0x0800;
+    arp_hdr->hw_addr_len = sizeof(mac_add_t);
+    arp_hdr->proto_addr_len = 4;
+
+    arp_hdr->op_code = ARP_BROAD_REQ;
+
+    memcpy(arp_hdr->src_mac.mac, IF_MAC(oif), sizeof(mac_add_t));
+
+    inet_pton(AF_INET, IF_IP(oif), &arp_hdr->src_ip);
+    arp_hdr->src_ip = htonl(arp_hdr->src_ip);
+
+    memset(arp_hdr->dst_mac.mac, 0,  sizeof(mac_add_t));
+
+    inet_pton(AF_INET, ip_addr, &arp_hdr->dst_ip);
+    arp_hdr->dst_ip = htonl(arp_hdr->dst_ip);
+
+    SET_COMMON_ETH_FCS(ethernet_hdr, sizeof(arp_hdr_t), 0); /*Not used*/
+    printf("ETH HDR TYPE RIGHT IN SEND BROAD FCN : %u\n",ethernet_hdr->type);
+    /*STEP 3 : Now dispatch the ARP Broadcast Request Packet out of interface*/
+    send_pkt_out((char *)ethernet_hdr, ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size,
+                    oif);
+
+    free(ethernet_hdr);
+}
+
+/*  
 void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
     //node sending the arp broadcast on the interface for the ip address of which arp resolution is being done
     //reserve memory for the eth hdr and the arp hdr
@@ -174,7 +233,9 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
         //only thing left is the FCS field of ethernet hdr
         //use macro written to access FCS
         ETH_FCS(ethernet_hdr, sizeof(arp_hdr_t)) = 0;//we arent using it for anything so set to 0
-        
+       
+        printf("Sending ARP Broadcast Req OUT!\n");
+        printf("ETH HDR TYPE : %u\n",ethernet_hdr->type); 
         //final thing is to send the packet out of local interface
         send_pkt_out((char *)ethernet_hdr, ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size, oif);
 
@@ -183,7 +244,7 @@ void send_arp_broadcast_request(node_t *node, interface_t *oif, char *ip_addr){
     }
 }
 
-
+*/
 static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif){
     //we need access to the broadcast message to whcich we are replying 
     arp_hdr_t *arp_hdr_in = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr_in));
@@ -282,29 +343,33 @@ static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t
 
 
 void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size){
-    
     //first header is ethernet header
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
     unsigned int vlan_id_to_tag =0;
     //check things to see if packet can be processed
+    
     if(l2_frame_recv_qualify_on_interface(interface, ethernet_hdr,&vlan_id_to_tag) == FALSE){
         printf("L2 Frame rejected");
         return;
     }
     
     
-    printf("L2 Frame accepted\n");
+    printf("L2 Frame accepted on node %s\n",node->node_name);
 
     //pkt has passed all test cases in the qualify function
 
 
     //deside what to do with packet based on type field
     if(IS_INTF_L3_MODE(interface)){
+        printf("ETH TYPE: %u\n",ethernet_hdr->type);
+        arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
+        printf("ARP TYPE : %u\n",arp_hdr->op_code);
         switch(ethernet_hdr->type){
             case ARP_MSG:
             {
+                printf("IT IS AN ARP MSG, Determining which type\n");
                 //access to payload
-                arp_hdr_t *arp_hdr = (arp_hdr_t *)(ethernet_hdr->payload);
+                arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
                 //check if its a broadcast message or an arp reply
                 switch(arp_hdr->op_code){
                     case ARP_BROAD_REQ:{
@@ -337,6 +402,7 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
         l2_switch_recv_frame(interface, pkt, vlan_id_to_tag ? new_pkt_size : pkt_size);
     }
     else{
+        printf("IF NOT CONFIGURED PROPERLY DO NOTHING");
         //do nothing
         return;
     }

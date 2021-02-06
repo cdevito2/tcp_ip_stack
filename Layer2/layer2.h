@@ -28,15 +28,6 @@
 #include "../tcpconst.h"
 
 #pragma pack(push,1)
-typedef struct ethernet_hdr_{
-    mac_add_t src_mac; //6 bytes
-    mac_add_t dst_mac; //6 bytes
-    char payload[248]; //max 1500 bytes but chose smaller
-    unsigned int FCS; //CRC field - frame check sequence
-    unsigned short type; //2 bytes
-}ethernet_hdr_t;
-
-
 
 typedef struct arp_hdr_{
     short hw_type; //1 for ethernet cable
@@ -45,11 +36,41 @@ typedef struct arp_hdr_{
     char proto_addr_len;//4 for ipv4
     short op_code;//Arp Req or reply
     mac_add_t src_mac;
-    mac_add_t dst_mac;
     unsigned int src_ip;
+    mac_add_t dst_mac;
     unsigned int dst_ip;
 
 }arp_hdr_t;
+
+typedef struct ethernet_hdr_{
+    mac_add_t src_mac; //6 bytes
+    mac_add_t dst_mac; //6 bytes
+    unsigned short type;
+    char payload[248]; //max 1500 bytes but chose smaller
+    unsigned int FCS; //CRC field - frame check sequence
+}ethernet_hdr_t;
+#pragma pack(pop)
+
+
+//MACRO DEFINED TO EVALUATE THE SIZE OF THE ETHERNET HEADER EXCLUDING THE PAYLOAD
+//what this does is it gets the size of the entire ethernet header struct and subtracts the payload size and returns
+#define ETH_HDR_SIZE_EXCL_PAYLOAD   \
+    (sizeof(ethernet_hdr_t) - sizeof(((ethernet_hdr_t *)0)->payload))
+
+
+
+
+
+
+//MACRO DEFINED TO RETURN THE FCS VALUE PRESENT IN THE FRAME
+//what this does it it gets the location of the start of the payload, then adds it to the payload size to get the end
+//at the end of the payload size is the 4 bytes of FCS so we cast to an unsigned int and return
+#define ETH_FCS(eth_hdr_ptr,payload_size)   \
+    (*(unsigned int *)(((char *)(((ethernet_hdr_t *)eth_hdr_ptr)->payload)+payload_size)))
+
+
+
+
 
  /*  VLAN SUPPORT STRUCTURES */
 
@@ -85,8 +106,8 @@ typedef struct apr_entry_{
     ip_add_t ip_addr;//key for table
     mac_add_t mac_addr;
     char oif_name[IF_NAME_SIZE];
-    bool_t is_sane;
     glthread_t arp_glue;
+    bool_t is_sane;
     //for future implementation list of pending packets for arp res
     glthread_t arp_pending_list;
 }arp_entry_t;
@@ -119,14 +140,6 @@ static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
 
 
 
-
-
-
-
-//MACRO DEFINED TO EVALUATE THE SIZE OF THE ETHERNET HEADER EXCLUDING THE PAYLOAD
-//what this does is it gets the size of the entire ethernet header struct and subtracts the payload size and returns
-#define ETH_HDR_SIZE_EXCL_PAYLOAD   \
-    (sizeof(ethernet_hdr_t) - sizeof(((ethernet_hdr_t *)0)->payload))
 
 
 
@@ -168,16 +181,30 @@ static inline void SET_COMMON_ETH_FCS(ethernet_hdr_t *ethernet_hdr, unsigned int
     }
 }
 
+static inline ethernet_hdr_t *
+ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
+
+    char *temp = calloc(1, pkt_size);
+    memcpy(temp, pkt, pkt_size);
+
+    ethernet_hdr_t *eth_hdr = (ethernet_hdr_t *)(pkt - ETH_HDR_SIZE_EXCL_PAYLOAD);
+    memset((char *)eth_hdr, 0, ETH_HDR_SIZE_EXCL_PAYLOAD);
+    memcpy(eth_hdr->payload, temp, pkt_size);
+    SET_COMMON_ETH_FCS(eth_hdr, pkt_size, 0);
+    free(temp);
+    return eth_hdr;
+}
 
 
 
+/*  
 
 //static function to allocate ethernet header with payload packet
-static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
+static inline ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_size){
     //must encapsulate data into payload of ethernet header
     //initialize all fields of ethernet header to zero also
     
-    char *temp = calloc(pkt,pkt_size);
+    char *temp = calloc(1,pkt_size);
     memcpy(temp,pkt,pkt_size);
 
     ethernet_hdr_t *header = (ethernet_hdr_t *)(pkt - ETH_HDR_SIZE_EXCL_PAYLOAD);
@@ -191,7 +218,7 @@ static ethernet_hdr_t * ALLOC_ETH_HDR_WITH_PAYLOAD(char *pkt, unsigned int pkt_s
     SET_COMMON_ETH_FCS(header,pkt_size, 0);    
 
 }
-
+*/
 
 //static function to decide whether routing device should accept or reject incoming packet
 static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, ethernet_hdr_t *ethernet_hdr, unsigned int *output_vlan_id){

@@ -25,7 +25,7 @@
 #include <stddef.h>
      
 #define NODE_NAME_SIZE 16
-#define IF_NAME_SIZE 32
+#define IF_NAME_SIZE 16
 #define MAX_INTF_PER_NODE 10
 
 /* Forward declarations to prevent recursive dependency compilation error */

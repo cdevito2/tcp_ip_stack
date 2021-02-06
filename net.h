@@ -53,12 +53,13 @@ static inline char * intf_l2_mode_str(intf_l2_mode_t intf_l2_mode){
 
 #pragma pack(push,1)
 typedef struct ip_add_{
-    char ip_addr[16]; //maximum of 15 characters
+    unsigned char ip_addr[16]; //maximum of 15 characters
 }ip_add_t;
 
 typedef struct mac_add_{
-    char mac[48];
+    unsigned char mac[6];
 }mac_add_t;
+#pragma pack(pop)
 
 typedef struct node_nw_prop_{
     bool_t is_lb_addr_config;//bool to see if loopback configured
@@ -70,7 +71,6 @@ typedef struct node_nw_prop_{
     mac_table_t *mac_table;
 
 }node_nw_prop_t;
-#pragma pack(pop)
 
 
 extern void init_arp_table(arp_table_t **arp_table);
@@ -112,7 +112,8 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
     /* default init */
     intf_nw_props->mask =0;
     memset(intf_nw_props->ip_add.ip_addr,0,16);
-    memset(intf_nw_props->mac_add.mac,0,48);
+    memset(intf_nw_props->mac_add.mac,0,sizeof(intf_nw_props->mac_add.mac));
+    memset(intf_nw_props->vlans,0,sizeof(intf_nw_props->vlans));
     intf_nw_props->is_ipadd_config = FALSE;
 
 }
