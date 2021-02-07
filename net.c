@@ -112,11 +112,19 @@ void dump_intf_props(interface_t *interface){
                 IF_MAC(interface)[2], IF_MAC(interface)[3],
                 IF_MAC(interface)[4], IF_MAC(interface)[5]);
     }
+
+
     else{
-        printf("\t IP ADDR = %s/%u","Nil",0);
+         printf("\t l2 mode = %s", intf_l2_mode_str(IF_L2_MODE(interface)));
+         printf("\t vlan membership : ");
+         int i = 0;
+         for(; i < MAX_VLAN_MEMBERSHIP; i++){
+            if(interface->intf_nw_props.vlans[i]){
+                printf("%u  ", interface->intf_nw_props.vlans[i]);
+            }
+         }
+         printf("\n");
     }
-
-
 }
 
 

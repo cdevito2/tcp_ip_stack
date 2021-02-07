@@ -126,7 +126,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 #define IF_MAC(intf_ptr)    ((intf_ptr)->intf_nw_props.mac_add.mac)
 #define IF_IP(intf_ptr)     ((intf_ptr)->intf_nw_props.ip_add.ip_addr)
 #define NODE_LO_ADDR(node_ptr)      ((node_ptr)->node_nw_prop.lb_addr.ip_addr)
-#define IS_INTF_L3_MODE(intf_ptr)   ((intf_ptr)->intf_nw_props.is_ipadd_config == TRUE)
+#define IS_INTF_L3_MODE(intf_ptr)   (intf_ptr->intf_nw_props.is_ipadd_config == TRUE)
 #define NODE_ARP_TABLE(node_ptr)    (node_ptr->node_nw_prop.arp_table)
 #define NODE_MAC_TABLE(node_ptr)     (node_ptr->node_nw_prop.mac_table)
 #define IF_L2_MODE(intf_ptr)    (intf_ptr->intf_nw_props.intf_l2_mode)       

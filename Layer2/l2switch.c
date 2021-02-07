@@ -133,6 +133,7 @@ bool_t mac_table_entry_add(mac_table_t *mac_table, mac_table_entry_t *mac_table_
 
 
 static void l2_switch_perform_mac_learning(node_t *node, char *src_mac, char *if_name){
+    printf("L2 switch %s is performing mac learning \n",node->node_name);
     bool_t rc;
     //create mac table entry
     mac_table_entry_t *mac_table_entry = calloc(1,sizeof(mac_table_entry_t));
@@ -157,7 +158,6 @@ static void l2_switch_perform_mac_learning(node_t *node, char *src_mac, char *if
 static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface_t *oif){
     //case 1 - if interface l3 mode assert
     assert(!IS_INTF_L3_MODE(oif));
-
     intf_l2_mode_t intf_l2_mode = IF_L2_MODE(oif);
 
     //case 6 unknown l2 mode
@@ -173,7 +173,6 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
         case ACCESS:
             {
                 unsigned int intf_vlan_id = get_access_intf_operating_vlan_id(oif);
-            
                 //case 1 - not vlan enabled and pkt is not tagged, simply forward it
                 if(!intf_vlan_id && !vlan_8021q_hdr){
                     send_pkt_out(pkt,pkt_size, oif);
@@ -194,8 +193,10 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
                 //case 5 - pkt is tagged and interface vlan enabled and the vlan id match
                 if(vlan_8021q_hdr && (intf_vlan_id == GET_8021Q_VLAN_ID(vlan_8021q_hdr))){
                     //l2 switch untaggs frame here
-                    unsigned int *new_pkt_size = 0;
+                    unsigned int new_pkt_size = 0;
                     ethernet_hdr = untag_pkt_with_vlan_id(ethernet_hdr, pkt_size, &new_pkt_size);
+                    arp_hdr_t *arp = (arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr);
+
                     send_pkt_out((char *)ethernet_hdr, new_pkt_size, oif);
                     return TRUE;
                 }
@@ -203,7 +204,6 @@ static bool_t l2_switch_send_pkt_out(char *pkt, unsigned int pkt_size, interface
             break;
         case TRUNK:
             {
-                
                //pkt taggeed, int trunk mode, vlan match , l2 switch forward
                unsigned int pkt_vlan_id=0;
                if(vlan_8021q_hdr){
@@ -268,14 +268,16 @@ static bool_t l2_switch_flood_pkt_out(node_t *node, interface_t *exempted_intf, 
 
 
 static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface, 
-                                    char *pkt, unsigned int pkt_size){
+                                    ethernet_hdr_t  *ethernet_hdr, unsigned int pkt_size){
+
     //purpose is to find the correct outgoing interface
     //todo this we do a mac lookup with the key being the destination mac address
-    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+   //ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
     //check if dest mac is broadcast address
     if(IS_MAC_BROADCAST_ADDR(ethernet_hdr->dst_mac.mac)){
         //flood out of all l2 interfaces except current one
         l2_switch_flood_pkt_out(node, recv_interface, (char *)ethernet_hdr, pkt_size);
+        return;
     }
 
     //now do mac table lookup
@@ -284,6 +286,7 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
     //if no match found flood pkt 
     if(!mac_table_entry){
         l2_switch_flood_pkt_out(node, recv_interface, (char *)ethernet_hdr, pkt_size);
+        return;
     }
 
     //if match found send packet out of specific interface
@@ -300,20 +303,31 @@ static void l2_switch_forward_frame(node_t *node, interface_t *recv_interface,
 
 
 
-void l2_switch_recv_frame(interface_t *interface, char *pkt, unsigned int pkt_size){
+void l2_switch_recv_frame(interface_t *interface, ethernet_hdr_t *ethernet_hdr, unsigned int pkt_size){
     //2 functions are to perform mac learning and to forward frame
     //step 1: extract the src and destination mac address
     node_t *node = interface->att_node;
     
-    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    //ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
 
-    char *dst_mac = (char *)ethernet_hdr->dst_mac.mac;
     char *src_mac = (char *)ethernet_hdr->src_mac.mac;
+    char *dst_mac = (char *)ethernet_hdr->dst_mac.mac;
 
-    //perform mac learning to add to the mac table
+    printf("\t DEST MAC : %u:%u:%u:%u:%u:%u\n", 
+                    ethernet_hdr->dst_mac.mac[0], ethernet_hdr->dst_mac.mac[1],
+        
+                    ethernet_hdr->dst_mac.mac[2], ethernet_hdr->dst_mac.mac[3],
+                    ethernet_hdr->dst_mac.mac[4], ethernet_hdr->dst_mac.mac[5]);
+        //perform mac learning to add to the mac table
+    
+    printf("\t SRC MAC : %u:%u:%u:%u:%u:%u\n", 
+                    ethernet_hdr->src_mac.mac[0], ethernet_hdr->src_mac.mac[1],
+        
+                    ethernet_hdr->src_mac.mac[2], ethernet_hdr->src_mac.mac[3],
+                    ethernet_hdr->src_mac.mac[4], ethernet_hdr->src_mac.mac[5]);
     l2_switch_perform_mac_learning(node,src_mac, interface->if_name);
 
-    l2_switch_forward_frame(node, interface, pkt, pkt_size);
+    l2_switch_forward_frame(node, interface, ethernet_hdr, pkt_size);
 }
 
 

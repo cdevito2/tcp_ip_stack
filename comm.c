@@ -57,7 +57,6 @@ static int _send_pkt_out(int sock_fd, char *pkt_data, unsigned int pkt_size, uns
     struct hostent *host = (struct hostent *)gethostbyname("127.0.0.1");
     dest_addr.sin_addr = *((struct in_addr *)host->h_addr);
     //now we have defined the dest address now send, note function that calls this function has opened a socket already
-    printf("In _send_pkt_out function\n");
     rc = sendto(sock_fd,pkt_data,pkt_size,0,(struct sockaddr *)&dest_addr, sizeof(struct sockaddr));
     return rc;
 
@@ -75,10 +74,7 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
     if(!recv_intf){
         printf("Error: Pkt received on unknown unterface %s on node %s\n",recv_intf->if_name,receiving_node->node_name);
     }
-    printf("PKT RECV ON %s\n",recv_intf->if_name);
-    printf("In _pkt_receive fcn\n");
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)(pkt_with_aux_data+IF_NAME_SIZE);
-    printf("IN FIRST PKT RECV FUNCTION ETH TYPE : %u\n",ethernet_hdr->type);
     //invoke call to receive packet
     //note that pkt_with_aux_data right+shitfs the packet pointer to the start of data
     pkt_receive(receiving_node,recv_intf,pkt_with_aux_data+IF_NAME_SIZE,pkt_size - IF_NAME_SIZE);
@@ -124,11 +120,8 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
     //ingress journey of packet starts from here in the TCP IP stack
     //here we perform a right shift to the packet pointer to the right boundary, right before the pkt data, note previously it was pointing to the beginning of data but we need to add space before it
     ethernet_hdr_t *eth = (ethernet_hdr_t *)pkt;
-    printf("ETH TYPE BEFORE PKT SHIFT : %u\n",eth->type);
     pkt = pkt_buffer_shift_right(pkt,pkt_size, MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE);
     ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
-    printf("ETH TYPE IN PKT RECEIVE %u\n",ethernet_hdr->type); 
-    printf("In pkt_receive funciton, sending to layer2_frame recv\n");
     //further processing of packet
     ///*  THIS FUNCTION IS THE ENTRY POINT INTO THE TCP IP STACK FROM THE BOTTOM! */
     //note that packet pointer at this point is pointing to the data in the already right shifted packet buffer 
@@ -169,8 +162,6 @@ send_pkt_out(char *pkt, unsigned int pkt_size,
                                     &interface->link->intf2 : &interface->link->intf1;
 
     ethernet_hdr_t *ethhdr = (ethernet_hdr_t *)pkt;
-    printf("ETH HDR AT TOP OF SEND FCN : %u\n",ethhdr->type);
-    printf("PKT SIZE : %u\n",pkt_size);
     memset(send_buffer, 0, MAX_PACKET_BUFFER_SIZE);
 
     char *pkt_with_aux_data = send_buffer;
@@ -181,7 +172,6 @@ send_pkt_out(char *pkt, unsigned int pkt_size,
     memcpy(pkt_with_aux_data + IF_NAME_SIZE, pkt, pkt_size);
 
     ethernet_hdr_t *eth = (ethernet_hdr_t *)(pkt_with_aux_data + IF_NAME_SIZE);
-    printf("ETH HDR IN SEND PKT BEFORE _SEND : %u\n",eth->type);
     rc = _send_pkt_out(sock, pkt_with_aux_data, pkt_size + IF_NAME_SIZE, 
                         dst_udp_port_no);
 
