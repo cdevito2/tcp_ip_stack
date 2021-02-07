@@ -43,8 +43,8 @@ typedef struct arp_hdr_{
 }arp_hdr_t;
 
 typedef struct ethernet_hdr_{
+    mac_add_t dst_mac;
     mac_add_t src_mac; //6 bytes
-    mac_add_t dst_mac; //6 bytes
     unsigned short type;
     char payload[248]; //max 1500 bytes but chose smaller
     unsigned int FCS; //CRC field - frame check sequence
@@ -75,6 +75,7 @@ typedef struct ethernet_hdr_{
  /*  VLAN SUPPORT STRUCTURES */
 
 //4 byte vlan header
+#pragma pack(push,1)
 typedef struct vlan_8021q_hdr_{
     unsigned short tpid; // set to 0x8100
     short tci_pcp : 3;  //3 bits, not using
@@ -269,14 +270,14 @@ static inline bool_t l2_frame_recv_qualify_on_interface(interface_t *interface, 
         
         
         //case 3 - if pkt not tagged and switch not in vlan
-        if(!intf_vlan_id && ! vlan_8021q_hdr){
+        if(!intf_vlan_id && !vlan_8021q_hdr){
             return TRUE;
         }
 
 
         //case 6 - switch in vlan but pkt not tagged, accept
         if(intf_vlan_id && !vlan_8021q_hdr){
-            output_vlan_id = intf_vlan_id;//tag frame with this vlan id
+            *output_vlan_id = intf_vlan_id;//tag frame with this vlan id
             return TRUE;
         }
         

@@ -313,18 +313,6 @@ void l2_switch_recv_frame(interface_t *interface, ethernet_hdr_t *ethernet_hdr, 
     char *src_mac = (char *)ethernet_hdr->src_mac.mac;
     char *dst_mac = (char *)ethernet_hdr->dst_mac.mac;
 
-    printf("\t DEST MAC : %u:%u:%u:%u:%u:%u\n", 
-                    ethernet_hdr->dst_mac.mac[0], ethernet_hdr->dst_mac.mac[1],
-        
-                    ethernet_hdr->dst_mac.mac[2], ethernet_hdr->dst_mac.mac[3],
-                    ethernet_hdr->dst_mac.mac[4], ethernet_hdr->dst_mac.mac[5]);
-        //perform mac learning to add to the mac table
-    
-    printf("\t SRC MAC : %u:%u:%u:%u:%u:%u\n", 
-                    ethernet_hdr->src_mac.mac[0], ethernet_hdr->src_mac.mac[1],
-        
-                    ethernet_hdr->src_mac.mac[2], ethernet_hdr->src_mac.mac[3],
-                    ethernet_hdr->src_mac.mac[4], ethernet_hdr->src_mac.mac[5]);
     l2_switch_perform_mac_learning(node,src_mac, interface->if_name);
 
     l2_switch_forward_frame(node, interface, ethernet_hdr, pkt_size);

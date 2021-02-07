@@ -320,7 +320,35 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
 
 
 
+static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t *ethernet_hdr, uint32_t pkt_size){
 
+        switch(ethernet_hdr->type){
+            case ARP_MSG:
+            {
+                //access to payload
+                arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
+                //check if its a broadcast message or an arp reply
+                switch(arp_hdr->op_code){
+                    case ARP_BROAD_REQ:{
+                        process_arp_broadcast_request(node, interface, ethernet_hdr);
+                        break;
+                    }
+                    case ARP_REPLY:{
+                        process_arp_reply_msg(node, interface, ethernet_hdr);
+                        break;
+                    }
+                }
+            }
+            break;
+            case ETH_IP:
+                
+            default:
+                //assume ip packet
+                //promote to layer3 - todo implement 
+               // promote_pkt_to_layer3(node, interface, pkt, pkt_size);
+                break;
+        }
+}
 
 
 
@@ -363,31 +391,7 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
 
     //deside what to do with packet based on type field
     if(IS_INTF_L3_MODE(interface)){
-        arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
-        switch(ethernet_hdr->type){
-            case ARP_MSG:
-            {
-                //access to payload
-                arp_hdr_t *arp_hdr = (arp_hdr_t *)(GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr));
-                //check if its a broadcast message or an arp reply
-                switch(arp_hdr->op_code){
-                    case ARP_BROAD_REQ:{
-                        process_arp_broadcast_request(node, interface, ethernet_hdr);
-                        break;
-                    }
-                    case ARP_REPLY:{
-                        process_arp_reply_msg(node, interface, ethernet_hdr);
-                        break;
-                    }
-                }
-            }
-            break;
-            default:
-                //assume ip packet
-                //promote to layer3 - todo implement 
-               // promote_pkt_to_layer3(node, interface, pkt, pkt_size);
-                break;
-        }
+        promote_pkt_to_layer2(node,interface,ethernet_hdr,pkt_size);
     }
     else if(IF_L2_MODE(interface) == ACCESS || IF_L2_MODE(interface) == TRUNK){
 
@@ -395,19 +399,9 @@ void layer2_frame_recv(node_t *node, interface_t *interface, char *pkt, unsigned
         //check if frame needs to be tagged
         unsigned int new_pkt_size =0;
         if(vlan_id_to_tag){
-            printf("WE ARE TAGGING HERE \n");
             pkt = (char *)tag_pkt_with_vlan_id((ethernet_hdr_t *)pkt, pkt_size, vlan_id_to_tag, &new_pkt_size);
 
         }
-        /*  
-        ethernet_hdr_t *ethernet_hdrr = (ethernet_hdr_t *)pkt;
-
-        printf("\t DEST MAC AT THIS POINT: %u:%u:%u:%u:%u:%u\n", 
-                    ethernet_hdrr->dst_mac.mac[0], ethernet_hdrr->dst_mac.mac[1],
-        
-                    ethernet_hdrr->dst_mac.mac[2], ethernet_hdrr->dst_mac.mac[3],
-                    ethernet_hdrr->dst_mac.mac[4], ethernet_hdrr->dst_mac.mac[5]);
-        */
         l2_switch_recv_frame(interface, pkt, vlan_id_to_tag ? new_pkt_size : pkt_size);
     }
     else{
@@ -694,11 +688,6 @@ tag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr,
     memcpy((char *)&ethernet_hdr_old, (char *)ethernet_hdr, 
                 ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(ethernet_hdr_old.FCS));
 
-        printf("\t VLAN TAG FCN OLD DEST MAC : %u:%u:%u:%u:%u:%u\n", 
-                ethernet_hdr_old.dst_mac.mac[0], ethernet_hdr_old.dst_mac.mac[1],
-        
-                ethernet_hdr_old.dst_mac.mac[2], ethernet_hdr_old.dst_mac.mac[3],
-                ethernet_hdr_old.dst_mac.mac[4], ethernet_hdr_old.dst_mac.mac[5]);
     
     
     
@@ -721,23 +710,12 @@ tag_pkt_with_vlan_id(ethernet_hdr_t *ethernet_hdr,
     /*Type field*/
     vlan_ethernet_hdr->type = ethernet_hdr_old.type;
 
-        printf("\t VLAN TAG FCN DEST MAC AFTER TAG: %u:%u:%u:%u:%u:%u\n", 
-                vlan_ethernet_hdr->dst_mac.mac[0], vlan_ethernet_hdr->dst_mac.mac[1],
-        
-                vlan_ethernet_hdr->dst_mac.mac[2], vlan_ethernet_hdr->dst_mac.mac[3],
-                vlan_ethernet_hdr->dst_mac.mac[4], vlan_ethernet_hdr->dst_mac.mac[5]);
     /*No need to copy data*/
 
     /*Update checksum, however not used*/
     SET_COMMON_ETH_FCS((ethernet_hdr_t *)vlan_ethernet_hdr, payload_size, 0 );
     *new_pkt_size = total_pkt_size  + sizeof(vlan_8021q_hdr_t);
 
-     ethernet_hdr_t *vlan_ethernet_hdrr = (ethernet_hdr_t *)vlan_ethernet_hdr;
-     printf("\t VLAN TAG FCN DEST MAC AFTER TAG WE R RET THIS: %u:%u:%u:%u:%u:%u\n", 
-                vlan_ethernet_hdrr->dst_mac.mac[0], vlan_ethernet_hdrr->dst_mac.mac[1],
-        
-                vlan_ethernet_hdrr->dst_mac.mac[2], vlan_ethernet_hdrr->dst_mac.mac[3],
-                vlan_ethernet_hdrr->dst_mac.mac[4], vlan_ethernet_hdrr->dst_mac.mac[5]);
 
 
     return (ethernet_hdr_t *)vlan_ethernet_hdr;
