@@ -72,7 +72,11 @@ static inline void initialize_ip_hdr(ip_hdr_t *ip_hdr){
 }
 
 
-
+#define IP_HDR_LEN_BYTES(ip_hdr_ptr)    (ip_hdr_ptr->ihl * 4)
+#define IP_HDR_TOTAL_LEN_IN_BYTES(ip_hdr_ptr)   (ip_hdr_ptr->total_length * 4)
+#define INCREMENT_IPHDR(ip_hdr_ptr)     ((char *)ip_hdr_ptr + (ip_hdr_ptr->ihl *4))
+#define IP_HDR_PAYLOAD_SIZE(ip_hdr_ptr) (IP_HDR_TOTAL_LEN_IN_BYTES(pi_hdr_ptr) - \
+        IP_HDR_LEN_BYTES(ip_hdr_ptr))   
 
 
 
