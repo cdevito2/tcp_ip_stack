@@ -318,7 +318,8 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
 }
 
 
-
+extern void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt,
+                                    unsigned int pkt_size, int L3_protocol_type);
 
 static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t *ethernet_hdr, uint32_t pkt_size){
 
@@ -341,6 +342,9 @@ static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t 
             }
             break;
             case ETH_IP:
+                promote_pkt_to_layer3(node,iif,GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr,
+                        pkt_size - GET_ETH_HDR_SIZE_EXCL_PAYLOAD(ethernet_hdr),
+                        ethernet_hdr->type);
                 
             default:
                 //assume ip packet

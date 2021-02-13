@@ -10,6 +10,9 @@ OBJS=gluethread/glthread.o\
 		  net.o\
 		  comm.o\
 		  Layer2/layer2.o\
+		  Layer3/layer3.o\
+		  Layer5/layer5.o\
+		  Layer5/ping.o\
 		  nwcli.o\
 		  utils.o\
 		  Layer2/l2switch.o
@@ -36,6 +39,12 @@ utils.o:utils.c
 	${CC} ${CFLAGS} -c -I . utils.c -o utils.o
 Layer2/layer2.o:Layer2/layer2.c
 	${CC} ${CFLAGS} -c -I . Layer2/layer2.c -o Layer2/layer2.o
+Layer3/layer3.o:Layer3/layer3.c
+	${CC} ${CFLAGS} -c -I . Layer3/layer3.c -o Layer3/layer3.o
+Layer5/layer5.o:Layer5/layer5.c
+	${CC} ${CFLAGS} -c -I . Layer5/layer5.c -o Layer5/layer5.o
+Layer5/ping.o:Layer5/ping.c
+	${CC} ${CFLAGS} -c -I .Layer5/ping.c -o Layer5/ping.o
 Layer2/l2switch.o:Layer2/l2switch.c
 	${CC} ${CFLAGS} -c -I . Layer2/l2switch.c -o Layer2/l2switch.o	 
 CommandParser/libcli.a:

@@ -28,6 +28,44 @@
 
 
 
+static bool_t l3_is_direct_route(l3_route_t *l3_route){
+    return (l3_route->is_direct);
+}
+
+
+//TODO:check if this fcn should be static
+static bool_t is_layer3_local_delivery(node_t *node, unsigned int dst_ip){
+    //check if dest ip matches with interfaces of router
+    char dest_ip_str[16];
+    dest_ip_str[15] = '\0';
+    char *intf_addr = NULL;
+    dst_ip = htonl(dst_ip);
+    inet_ntop(AF_INET,&dst_ip,dest_ip_str,16);
+
+
+    //check if the dest ip is loopback
+    if(strncmp(NODE_LO_ADDR(node),dest_ip_str,16)==0){
+        return TRUE;
+    }
+
+
+    //else loop and check node interfaces
+    unsigned int i=0;
+    interface_t *intf;
+    for (;i<MAX_INTF_PER_NODE;i++){
+        intf=node->intf[i];
+        if(!intf){
+            return FALSE;
+        }
+
+        intf_addr = IF_IP(intf);
+        if(strncmp(intf_addr,dest_ip_str,16)==0){
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 
 //TOTO : route lookup function , LPM lookup function
 
@@ -184,6 +222,205 @@ void rt_table_add_route(rt_table_t *rt_Table, char *dst, char mask, char *gw, ch
 
 
 
+static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int size, int protocol_number,unsigned int dest_ip_address){
+
+    ip_hdr_t ip_hdr;
+    initialize_ip_hdr(&ip_hdr);
+
+    //fill ip hdr fields
+    ip_hdr.protocol = protocol_number;
+    unsigned int addr_int = 0;
+    inet_pton(AF_INET,NODE_LO_ADDR(node),&addr_int,16);
+    add_int = htonl(addr_int);
+
+    ip_hdr.src_ip = addr_int;
+    ip_hdr.dst_ip = dest_ip_address;
+
+
+    //in vid he said to put as unsigned short?
+    ip_hdr.total_length = (unsigned short)ip_hdr.ihl * 4 + (unsigned short)(size/4) + (unsigned short)((size %4) ? 1:0)
+
+
+
+    l3_route_t *l3_route = l3rib_lookup_lpm(NODE_RT_TABLE(node), ip_hdr.dst_ip);
+
+    if(!l3_route){
+        printf("Node : %s : No L3 Route\n",node->node_name);
+        return;
+    }
+
+    //else we found a route, is it direct or not
+    //first prepare a packet
+    char *new_pkt = NULL;
+    unsigned int new_pkt_size = 0;
+    new_pkt_size = ip_hdr.total_length * 4;
+    new_pkt = calloc(1,MAX_PACKET_BUFFER_SIZE);
+    memcpy(new_pkt,(char *)&ip_hdr,ip_hdr.ihl*4);
+
+    if(pkt && size){
+        //ip hdr followed by application data
+        memcpy(new_pkt+(ip_hdr.ihl*4),pkt,size);
+    }
+
+
+
+
+    //is direct route?
+    bool_t is_direct_route = l3_is_direct_route(l3_route);
+
+    unsigned int next_hop_ip;
+
+    if(!is_direct_route){
+        //router forward to next hop
+        inet_pton(AF_INET,l3_route->gw_ip,&next_hop_ip);
+        next_hop_ip = htonl(next_hop_ip);
+    }
+    else{
+        //route is local subnet
+        //either trying to forward to host machine in subnet
+        //or self ping(interface on this router)
+        next_hop_ip = dest_ip_address;
+    }
+
+    //create space so link layer can add ethernet hdr
+    char *shifted_pkt_buffer = pkt_buffer_shift_right(new_pkt,new_pkt_size, MAX_PACKET_BUFFER_SIZE);
+
+    //send to link layer
+    demote_pkt_to_layer2(node,next_hop_ip, is_direct_route ?0:l3_route->oif,shifted_pkt_buffer,new_pkt_size,ETH_IP);
+
+    free(new_pkt);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void demote_pkt_to_layer3(node_t *node, char *pkt, unsigned int size, int protocol_number, unsigned int dest_ip_address){
+
+    layer3_pkt_receive_from_top(node,pkt,size,protocol_number,dest_ip_address);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+extern void demote_pkt_to_layer2(node_t *node,unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number);
+
+
+
+
+
+
+
+
+
+static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface, ip_hdr_t *pkt, unsigned int pkt_size){
+    
+
+    char *l4_hdr;
+    char *l5_hdr;
+    //step 1 : lookup routing table for matching entry
+    char dest_ip_addr[16];
+    det_ip_addr[15]='\0';
+    ip_hdr_t *ip_hdr = pkt;
+    unsigned int dest_ip = htonl(ip_hdr->dst_ip);
+    inet_ntop(AF_INET,&dest_ip,dest_ip_addr,16);
+
+    l3_route_t *l3_route = l3rib_lookup_lpm(NODE_RT_TABLE(node), ip_hdr->dst_ip);
+
+    if(!l3_route){
+        printf("Router %s : Cannot Route IP : %s\n",node->node_name,dest_ip_addr);
+    }
+
+    //found matching route
+    //check if its a direct route
+    if(l3_is_direct_route(l3_route)){
+        
+        
+        //case 1 - local delivery to interface on this router
+        if(is_layer3_local_delivery(node,ip_hdr->dst_ip)){
+            l4_hdr = (char *)INCREMENT_IP_HDR(ip_hdr);
+            l5_hdr = l4_hdr;
+
+            switch(ip_hdr->protocol){
+                case ICMP_PRO:
+                    printf("IP Address : %s, ping success \n",dest_ip_addr);
+                    break;
+                default:
+                    ; 
+            }
+
+        }
+
+
+        //case 2 - pkt for a machine in local subnet
+        //demote to link layer for arp and/or l2 forwarding
+        demote_pkt_to_layer2(node,0,NULL,(char *)ip_hdr, pkt_size, ETH_IP);
+        return;
+
+    }
+    else{
+        //its a remote subnet, forward to next hop
+        //demote to layer 2 to forward to next hop
+        ip_hdr->ttl--;
+        if(ip_hdr->ttl ==0){
+            //drop pkt
+            return;
+        }
+
+        unsigned int next_hop_ip;
+        inet_pton(AF_INET,l3_route->gw_ip,&next_hop_ip);
+        next_hop_ip = htonl(next_hop_ip);
+
+        demote_pkt_to_layer2(node,next_hop_ip,l3_route->oif,(char *)ip_hdr, pkt_size, ETH_IP);
+    }
+
+}
+
+
+
+static void _layer3_pkt_recv_from_layer2(node_t *node, interface_t *interface, char *pkt, 
+                                            uint32_t pkt_size, int L3_protocol_type){
+    switch(L3_protocol_type){
+        case ETH_IP:
+            layer3_ip_pkt_recv_from_layer2(node,interface,(ip_hdr_t *)pkt,pkt_size);
+            break;
+        default:
+            ;
+    }
+}
+
+
+
+void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size, int L3_protocol_number){
+        _layer3_pkt_recv_from_layer2(node,interface,pkt,pkt_size,L3_protocol_number);
+}
 
 
 

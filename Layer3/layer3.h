@@ -107,6 +107,16 @@ void rt_table_add_direct_route(rt_table_t *rt_table, char *dst, char mask);
 
 void dump_rt_table(rt_table_t *rt_table);
 
+void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt, unsigned int pkt_size, int L3_protocol_number);
+
+
+
+void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int protocol_number, unsigned int dest_ip_address);
+
+
+
+
+
 
 l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table, uint32_t dest_ip);
 #endif 
