@@ -178,11 +178,6 @@ send_arp_broadcast_request(node_t *node,
     inet_pton(AF_INET, ip_addr, &arp_hdr->dst_ip);
     arp_hdr->dst_ip = htonl(arp_hdr->dst_ip);
 
-    printf("\t DEST MAC : %u:%u:%u:%u:%u:%u\n", 
-                ethernet_hdr->dst_mac.mac[0], ethernet_hdr->dst_mac.mac[1],
-        
-                ethernet_hdr->dst_mac.mac[2], ethernet_hdr->dst_mac.mac[3],
-                ethernet_hdr->dst_mac.mac[4], ethernet_hdr->dst_mac.mac[5]);
     SET_COMMON_ETH_FCS(ethernet_hdr, sizeof(arp_hdr_t), 0); /*Not used*/
     /*STEP 3 : Now dispatch the ARP Broadcast Request Packet out of interface*/
     send_pkt_out((char *)ethernet_hdr, ETH_HDR_SIZE_EXCL_PAYLOAD + payload_size,
@@ -286,7 +281,6 @@ static void send_arp_reply_msg(ethernet_hdr_t *ethernet_hdr_in, interface_t *oif
     //right shift packet in the buffer
 
     char *shifted_pkt_buffer = pkt_buffer_shift_right((char *)ethernet_hdr_reply, total_pkt_size, MAX_PACKET_BUFFER_SIZE);
-    printf("SENDING ARP REPLY\n");
     //now send packet and free memory
     send_pkt_out(shifted_pkt_buffer, total_pkt_size, oif);
     free(ethernet_hdr_reply);
@@ -816,6 +810,7 @@ is_layer3_local_delivery(node_t *node,
 
 static void l2_forward_ip_packet(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, ethernet_hdr_t *pkt, unsigned int pkt_size){
 
+    
     interface_t *oif = NULL;
     char next_hop_ip_str[16];
     arp_entry_t *arp_entry = NULL;

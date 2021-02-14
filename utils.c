@@ -22,7 +22,12 @@
 #include <string.h>
 #include <stdint.h>
 
-void apply_mask(char *prefix, char mask, char *str_prefix){
+
+
+/*  void apply_mask(char *prefix, char mask, char *str_prefix){
+
+    printf("IP ADDR IN APPLY MASK FCN : %s\n",prefix);
+    printf("MASK VALUE : %u\n",mask);
 
     unsigned int ip_addr_int = 0;
     //convert ip to bytes, ex 192.168.251.9 = some decimal bnum
@@ -35,15 +40,30 @@ void apply_mask(char *prefix, char mask, char *str_prefix){
 
     subnet_mask = subnet_mask << trail_bits;
 
+    
     //do a bitwise AND to determine network id
     ip_addr_int = ip_addr_int & subnet_mask;
     ip_addr_int = htonl(ip_addr_int);
     inet_ntop(AF_INET,&ip_addr_int,str_prefix,16);
     str_prefix[15]='\0';
 
+    printf("APPLY MASK RETURN : %s\n",str_prefix);
 
+
+}*/
+
+void
+apply_mask(char *prefix, char mask, char *str_prefix){
+
+    unsigned int binary_prefix = 0, i = 0;
+    inet_pton(AF_INET, prefix, &binary_prefix);
+    binary_prefix = htonl(binary_prefix);
+    for(; i < (32 - mask); i++)
+        UNSET_BIT(binary_prefix, i);
+    binary_prefix = htonl(binary_prefix);
+    inet_ntop(AF_INET, &binary_prefix, str_prefix, 16);
+    str_prefix[15] = '\0';
 }
-
 void layer2_fill_with_broadcast_mac(char *mac_array){
     mac_array[0] = 0xFF;
     mac_array[1] = 0xFF;
