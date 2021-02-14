@@ -394,9 +394,7 @@ void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
 
 
 
-void promote_pkt_to_layer2(node_t *node, interface_t *recv_interface, ethernet_hdr_t *ethernet_hdr, uint32_t pkt_size);
 
-void demote_pkt_to_layer2(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number);
 
 
 

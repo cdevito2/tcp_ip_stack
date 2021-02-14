@@ -27,6 +27,7 @@
 #define ARP_MSG 806
 #define BROADCAST_MAC 0xFFFFFFFFFFFF
 #define VLAN_8021Q_PROTO 0x8100
-
+#define ETH_IP  0x8000
+#define ICMP_PRO    1
 
 #endif

@@ -318,10 +318,28 @@ static void process_arp_broadcast_request(node_t *node, interface_t *iif, ethern
 }
 
 
+
+
+
+static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
+    //make entry into arp table
+    //invoked by node when node recv msg
+    printf("%s : ARP reply msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iif->att_node->node_name);
+    //node has to make entry in arp table
+    arp_table_update_from_arp_reply(NODE_ARP_TABLE(node),(arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),iif);
+
+}
+
+
+
+
 extern void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt,
                                     unsigned int pkt_size, int L3_protocol_type);
 
-static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t *ethernet_hdr, uint32_t pkt_size){
+
+
+
+static void promote_pkt_to_layer2(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr, uint32_t pkt_size){
 
         switch(ethernet_hdr->type){
             case ARP_MSG:
@@ -331,18 +349,18 @@ static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t 
                 //check if its a broadcast message or an arp reply
                 switch(arp_hdr->op_code){
                     case ARP_BROAD_REQ:{
-                        process_arp_broadcast_request(node, interface, ethernet_hdr);
+                        process_arp_broadcast_request(node, iif, ethernet_hdr);
                         break;
                     }
                     case ARP_REPLY:{
-                        process_arp_reply_msg(node, interface, ethernet_hdr);
+                        process_arp_reply_msg(node, iif, ethernet_hdr);
                         break;
                     }
                 }
             }
             break;
             case ETH_IP:
-                promote_pkt_to_layer3(node,iif,GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr,
+                promote_pkt_to_layer3(node,iif,GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),
                         pkt_size - GET_ETH_HDR_SIZE_EXCL_PAYLOAD(ethernet_hdr),
                         ethernet_hdr->type);
                 
@@ -358,14 +376,6 @@ static void promote_pkt_to_layer2(node_t*node, interface_t *iif, ethernet_hdr_t 
 
 
 
-static void process_arp_reply_msg(node_t *node, interface_t *iif, ethernet_hdr_t *ethernet_hdr){
-    //make entry into arp table
-    //invoked by node when node recv msg
-    printf("%s : ARP reply msg recvd on interface %s of node %s\n", __FUNCTION__, iif->if_name, iif->att_node->node_name);
-    //node has to make entry in arp table
-    arp_table_update_from_arp_reply(NODE_ARP_TABLE(node),(arp_hdr_t *)GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),iif);
-
-}
 
 
 
@@ -797,6 +807,115 @@ void node_set_intf_l2_mode(node_t *node, char *intf_name, intf_l2_mode_t intf_l2
 
 
 
+
+extern bool_t
+is_layer3_local_delivery(node_t *node, 
+                         uint32_t dst_ip);
+
+
+
+static void l2_forward_ip_packet(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, ethernet_hdr_t *pkt, unsigned int pkt_size){
+
+    interface_t *oif = NULL;
+    char next_hop_ip_str[16];
+    arp_entry_t *arp_entry = NULL;
+    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
+    unsigned int ethernet_payload_size = pkt_size - ETH_HDR_SIZE_EXCL_PAYLOAD;
+    
+    next_hop_ip = htonl(next_hop_ip);
+    inet_ntop(AF_INET,&next_hop_ip,next_hop_ip_str,16);
+    
+    
+    //step 1 check if outgoing interface is NULL meaning its either self ping or local delivery in subnet
+
+    if(outgoing_intf){
+        //means forward to next hop ip, L2 forward out of this interface
+        //resolve arp for the next hop ip
+        oif = get_node_if_by_name(node,outgoing_intf);
+        arp_entry = arp_table_lookup(NODE_ARP_TABLE(node), next_hop_ip_str);
+
+        //if no arp entry send arp broadcast address
+        if(!arp_entry){
+            //TODO ASSERT FOR NOW
+            assert(0);
+            send_arp_broadcast_request(node,oif,next_hop_ip_str);
+        }
+        goto l2_frame_prepare;
+    }
+
+    
+    //now check if its direct delivery to host in subnet or self ping
+    if(is_layer3_local_delivery(node,next_hop_ip)){
+        //SELF PING-bounce back to network layer
+        promote_pkt_to_layer3(node,0,GET_ETHERNET_HDR_PAYLOAD(ethernet_hdr),pkt_size - GET_ETH_HDR_SIZE_EXCL_PAYLOAD(ethernet_hdr),ethernet_hdr->type);
+
+        return;
+
+    }
+
+    //else its local delivery to host in subnet
+    //find outgoing inteface and resolve arp
+    oif = node_get_matching_subnet_interface(node,next_hop_ip_str);
+    if(!oif){
+        printf(" %s : Error : local matching subnet for IP : %s couldnt be found\n",
+                node->node_name,next_hop_ip_str);
+        return;
+    }
+
+    //found outgoing subnet interface, now see if we know destination mac, if not use ARP
+    arp_entry = arp_table_lookup(NODE_ARP_TABLE(node), next_hop_ip_str);
+    
+    if(!arp_entry){
+        assert(0);//keep this for now until on demand arp is finished TODO
+        send_arp_broadcast_address(node,oif,next_hop_ip_str);
+        return;
+    }
+    
+    
+    
+    
+    
+    l2_frame_prepare:
+        memcpy(ethernet_hdr->dst_mac.mac,arp_entry->mac_addr.mac,sizeof(mac_add_t));
+        memcpy(ethernet_hdr->src_mac.mac,IF_MAC(oif),sizeof(mac_add_t));
+        SET_COMMON_ETH_FCS(ethernet_hdr,ethernet_payload_size,0);
+        send_pkt_out((char *)ethernet_hdr,pkt_size,oif);
+        
+
+}
+
+
+
+
+
+
+static void layer2_pkt_receive_from_top(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number){
+    
+    //add assert here mabye in future
+
+    //check protocol layer is ip protocol
+    if(protocol_number = ETH_IP){
+        //expand packet to make room for eth hdr
+        ethernet_hdr_t *empty_ethernet_hdr = ALLOC_ETH_HDR_WITH_PAYLOAD(pkt,pkt_size);
+        //init type field
+        empty_ethernet_hdr->type = ETH_IP;
+
+        l2_forward_ip_packet(node,next_hop_ip,outgoing_intf,empty_ethernet_hdr,pkt_size + ETH_HDR_SIZE_EXCL_PAYLOAD);
+
+    }
+}
+
+
+
+
+
+
+
+
+void demote_pkt_to_layer2(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number){
+
+    layer2_pkt_receive_from_top(node,next_hop_ip, outgoing_intf, pkt, pkt_size, protocol_number);
+}
 
 
 

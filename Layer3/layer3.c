@@ -33,8 +33,7 @@ static bool_t l3_is_direct_route(l3_route_t *l3_route){
 }
 
 
-//TODO:check if this fcn should be static
-static bool_t is_layer3_local_delivery(node_t *node, unsigned int dst_ip){
+bool_t is_layer3_local_delivery(node_t *node, unsigned int dst_ip){
     //check if dest ip matches with interfaces of router
     char dest_ip_str[16];
     dest_ip_str[15] = '\0';
@@ -75,7 +74,7 @@ void init_rt_table(rt_table_t **rt_table){
     //calloc mem
     *rt_table = calloc(1,sizeof(rt_table_t));
     //init glthread
-    init_glthread((*rt_table)->route_list);
+    init_glthread(&((*rt_table)->route_list));
 }
 
 
@@ -84,16 +83,16 @@ void init_rt_table(rt_table_t **rt_table){
 
 
 
-l3_route_t * rt_table_lookup(rt_Table_t *rt_table, char *ip_addr, char mask){
+l3_route_t * rt_table_lookup(rt_table_t *rt_table, char *ip_addr, char mask){
     glthread_t *curr;
     l3_route_t *l3_route;
 
 
     //loop through routing table
-    ITERATE_GLTHREAD_BEGIN(&rt_Table->route_list, curr){
+    ITERATE_GLTHREAD_BEGIN(&rt_table->route_list, curr){
         l3_route = rt_glue_to_l3_route(curr);
         if(strncmp(l3_route->dest,ip_addr,16) == 0 && l3_route->mask == mask){
-            return l3_route
+            return l3_route;
         }
     } ITERATE_GLTHREAD_END(&rt_table->route_list,curr);
 }
@@ -109,7 +108,7 @@ l3_route_t * rt_table_lookup(rt_Table_t *rt_table, char *ip_addr, char mask){
 void delete_rt_table_entry(rt_table_t *rt_table, char *ip_addr, char mask){
     char dst_str_with_mask[16];
     apply_mask(ip_addr,mask,dst_str_with_mask);
-    l3_route_t *l3_route = rt_table_lookup(rt_Table,dst_str_with_mask,mask);
+    l3_route_t *l3_route = rt_table_lookup(rt_table,dst_str_with_mask,mask);
     if(!l3_route){
         return;
     }
@@ -132,7 +131,7 @@ void delete_rt_table_entry(rt_table_t *rt_table, char *ip_addr, char mask){
 
 
 
-static bool_t *_rt_table_entry_add(rt_table_t *rt_table, l3_route_t *l3_route){
+static bool_t _rt_table_entry_add(rt_table_t *rt_table, l3_route_t *l3_route){
     //first check if route already exists
     l3_route_t *l3_route_old = rt_table_lookup(rt_table,l3_route->dest,l3_route->mask);
 
@@ -167,16 +166,54 @@ void rt_table_add_direct_route(rt_table_t *rt_table, char *dst, char mask){
 
 
 
-void rt_table_add_route(rt_table_t *rt_Table, char *dst, char mask, char *gw, char *oif){
+l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table,unsigned int dest_ip){
+    l3_route_t *l3_route = NULL;
+    l3_route_t *lpm_l3_route = NULL;
+    l3_route_t *default_l3_rt = NULL;
+
+    glthread_t *curr = NULL;
+    char subnet[16];
+    char dest_ip_str[16];
+    char longest_mask = 0;
+
+    dest_ip = htonl(dest_ip);
+    inet_ntop(AF_INET,&dest_ip,dest_ip_str,16);
+    dest_ip_str[15] = '\0';
+
+    ITERATE_GLTHREAD_BEGIN(&rt_table->route_list,curr){
+        l3_route = rt_glue_to_l3_route(curr);
+        memset(subnet,0,16);
+        apply_mask(dest_ip_str,l3_route->mask,subnet);
+
+        if(strncmp("0.0.0.0",l3_route->dest,16) == 0 && l3_route->mask ==0){
+            default_l3_rt = l3_route;
+        }
+
+        else if(strncmp(subnet,l3_route->dest,strlen(subnet)) == 0){
+            if (l3_route->mask > longest_mask){
+                longest_mask = l3_route->mask;
+                lpm_l3_route = l3_route;
+            }
+        }
+    }ITERATE_GLTHREAD_END(&rt_Table->route_list,curr);
+    return lpm_l3_route ? lpm_l3_route : default_l3_rt;
+}
+
+
+
+
+
+
+void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif){
     unsigned int dst_int;
     char dest_str_with_mask[16];
     apply_mask(dst,mask,dest_str_with_mask);
-    inet_pton(AF_INET,dst_str_with_msk,&dst_int);
+    inet_pton(AF_INET,dest_str_with_mask,&dst_int);
 
     //dest route is the subnet ID which is why we apply mask
 
 
-    l3_route_t *l3_route - l3rib_lookup_lpm(rt_table,dst_int);
+    l3_route_t *l3_route = l3rib_lookup_lpm(rt_table,dst_int);
 
     //init mem
     l3_route = calloc(1,sizeof(l3_route_t));
@@ -212,7 +249,7 @@ void rt_table_add_route(rt_table_t *rt_Table, char *dst, char mask, char *gw, ch
     //add route into table
     if(! _rt_table_entry_add(rt_table,l3_route)){
         printf("Error : Route %s/%d Instantiation Failed \n",
-            dst_str_with_mask,mask);
+            dest_str_with_mask,mask);
         free(l3_route);
     }
 
@@ -220,6 +257,7 @@ void rt_table_add_route(rt_table_t *rt_Table, char *dst, char mask, char *gw, ch
 }
 
 
+extern void demote_pkt_to_layer2(node_t *node,unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number);
 
 
 static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int size, int protocol_number,unsigned int dest_ip_address){
@@ -230,15 +268,15 @@ static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int si
     //fill ip hdr fields
     ip_hdr.protocol = protocol_number;
     unsigned int addr_int = 0;
-    inet_pton(AF_INET,NODE_LO_ADDR(node),&addr_int,16);
-    add_int = htonl(addr_int);
+    inet_pton(AF_INET,NODE_LO_ADDR(node),&addr_int);
+    addr_int = htonl(addr_int);
 
     ip_hdr.src_ip = addr_int;
     ip_hdr.dst_ip = dest_ip_address;
 
 
     //in vid he said to put as unsigned short?
-    ip_hdr.total_length = (unsigned short)ip_hdr.ihl * 4 + (unsigned short)(size/4) + (unsigned short)((size %4) ? 1:0)
+    ip_hdr.total_length = (unsigned short)ip_hdr.ihl * 4 + (unsigned short)(size/4) + (unsigned short)((size %4) ? 1:0);
 
 
 
@@ -297,19 +335,7 @@ static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int si
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-void demote_pkt_to_layer3(node_t *node, char *pkt, unsigned int size, int protocol_number, unsigned int dest_ip_address){
+void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int protocol_number, unsigned int dest_ip_address){
 
     layer3_pkt_receive_from_top(node,pkt,size,protocol_number,dest_ip_address);
 
@@ -327,19 +353,6 @@ void demote_pkt_to_layer3(node_t *node, char *pkt, unsigned int size, int protoc
 
 
 
-
-
-
-extern void demote_pkt_to_layer2(node_t *node,unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number);
-
-
-
-
-
-
-
-
-
 static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface, ip_hdr_t *pkt, unsigned int pkt_size){
     
 
@@ -347,7 +360,7 @@ static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface,
     char *l5_hdr;
     //step 1 : lookup routing table for matching entry
     char dest_ip_addr[16];
-    det_ip_addr[15]='\0';
+    dest_ip_addr[15]='\0';
     ip_hdr_t *ip_hdr = pkt;
     unsigned int dest_ip = htonl(ip_hdr->dst_ip);
     inet_ntop(AF_INET,&dest_ip,dest_ip_addr,16);
@@ -365,7 +378,7 @@ static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface,
         
         //case 1 - local delivery to interface on this router
         if(is_layer3_local_delivery(node,ip_hdr->dst_ip)){
-            l4_hdr = (char *)INCREMENT_IP_HDR(ip_hdr);
+            l4_hdr = (char *)INCREMENT_IPHDR(ip_hdr);
             l5_hdr = l4_hdr;
 
             switch(ip_hdr->protocol){

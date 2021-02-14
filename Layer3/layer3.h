@@ -59,7 +59,7 @@ static inline void initialize_ip_hdr(ip_hdr_t *ip_hdr){
     ip_hdr->identification=0;
     ip_hdr->unused_flag=0;
     ip_hdr->DF_flag=1;
-    ip_hdr->MODE_flag=0;
+    ip_hdr->MORE_flag=0;
     ip_hdr->frag_offset=0;
 
     ip_hdr->ttl=64;
@@ -118,5 +118,13 @@ void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int pro
 
 
 
-l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table, uint32_t dest_ip);
+l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table, unsigned int dest_ip);
+
+
+#define IS_L3_ROUTES_EQUAL(rt1, rt2)              \
+    ((strncmp(rt1->dest, rt2->dest, 16) == 0) &&  \
+    (rt1->mask == rt2->mask) &&                   \
+    (rt1->is_direct == rt2->is_direct) &&         \
+    (strncmp(rt1->gw_ip, rt2->gw_ip, 16) == 0) && \
+    strncmp(rt1->oif, rt2->oif, IF_NAME_SIZE) == 0)
 #endif 
