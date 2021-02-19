@@ -136,7 +136,7 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
 int
 send_pkt_out(char *pkt, unsigned int pkt_size, 
              interface_t *interface){
-
+    printf("SENDING PKT\n");
     int rc = 0;
     node_t *sending_node = interface->att_node;
     node_t *nbr_node = get_nbr_node(interface);

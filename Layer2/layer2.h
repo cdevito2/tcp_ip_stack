@@ -26,6 +26,7 @@
 #include "../gluethread/glthread.h"
 #include <stdlib.h> //this is needed for calloc
 #include "../tcpconst.h"
+#include "../graph.h"
 
 #pragma pack(push,1)
 
@@ -70,6 +71,49 @@ typedef struct ethernet_hdr_{
 
 
 
+typedef struct arp_table_{
+
+    glthread_t arp_entries;
+} arp_table_t;
+
+typedef struct arp_pending_entry_ arp_pending_entry_t;
+typedef struct arp_entry_ arp_entry_t;
+typedef void (*arp_processing_fn)(node_t *, 
+                                  interface_t *oif,
+                                  arp_entry_t *, 
+                                  arp_pending_entry_t *);
+struct arp_pending_entry_{
+
+    glthread_t arp_pending_entry_glue;
+    arp_processing_fn cb;
+    unsigned int pkt_size;  /*Including ether net hdr*/
+    char pkt[0];
+};
+GLTHREAD_TO_STRUCT(arp_pending_entry_glue_to_arp_pending_entry, \
+    arp_pending_entry_t, arp_pending_entry_glue);
+
+
+struct arp_entry_{
+
+    ip_add_t ip_addr;   /*key*/
+    mac_add_t mac_addr;
+    char oif_name[IF_NAME_SIZE];
+    glthread_t arp_glue;
+    bool_t is_sane;
+    /* List of packets which are pending for
+     * this ARP resolution*/
+    glthread_t arp_pending_list;
+};
+GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
+GLTHREAD_TO_STRUCT(arp_pending_list_to_arp_entry, arp_entry_t, arp_pending_list);
+
+#define IS_ARP_ENTRIES_EQUAL(arp_entry_1, arp_entry_2)  \
+    (strncmp(arp_entry_1->ip_addr.ip_addr, arp_entry_2->ip_addr.ip_addr, 16) == 0 && \
+        strncmp(arp_entry_1->mac_addr.mac, arp_entry_2->mac_addr.mac, 6) == 0 && \
+        strncmp(arp_entry_1->oif_name, arp_entry_2->oif_name, IF_NAME_SIZE) == 0 && \
+        arp_entry_1->is_sane == arp_entry_2->is_sane &&     \
+        arp_entry_1->is_sane == FALSE)
+
 
 
  /*  VLAN SUPPORT STRUCTURES */
@@ -95,25 +139,6 @@ typedef struct vlan_ethernet_hdr_{
 
 #pragma pack(pop)
 
-typedef struct arp_table_{
-    glthread_t arp_entries;
-}arp_table_t;
-
-
-/* /
-typedef struct arp_entry_ arp_entry_t;
-*/
-typedef struct apr_entry_{
-    ip_add_t ip_addr;//key for table
-    mac_add_t mac_addr;
-    char oif_name[IF_NAME_SIZE];
-    glthread_t arp_glue;
-    bool_t is_sane;
-    //for future implementation list of pending packets for arp res
-    glthread_t arp_pending_list;
-}arp_entry_t;
-GLTHREAD_TO_STRUCT(arp_glue_to_arp_entry, arp_entry_t, arp_glue);
-
 
 
 
@@ -138,6 +163,7 @@ static inline vlan_8021q_hdr_t *is_pkt_vlan_tagged(ethernet_hdr_t *ethernet_hdr)
 static inline unsigned int GET_8021Q_VLAN_ID(vlan_8021q_hdr_t *vlan_8021q_hdr){
     return (unsigned int)(vlan_8021q_hdr->tci_vid);
 }
+
 
 
 
@@ -386,7 +412,7 @@ void init_arp_table(arp_table_t **arp_table);
 
 
 //CRUD operations on arp table
-bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry);//CREATE
+bool_t arp_table_entry_add(arp_table_t *arp_table, arp_entry_t *arp_entry, glthread_t **arp_pending_list);//CREATE
 arp_entry_t * arp_table_lookup(arp_table_t *arp_table, char *ip_addr);//REPLACE
 void arp_table_update_from_arp_reply(arp_table_t *arp_table, arp_hdr_t *arp_hdr, interface_t *iif);//UPDATE
 void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
@@ -396,8 +422,13 @@ void delete_arp_table_entry(arp_table_t *arp_table, char *ip_addr);//DELETE
 
 
 
+void add_arp_pending_entry(arp_entry_t *arp_entry, arp_processing_fn, char *pkt, unsigned int pkt_size);
 
 
+arp_entry_t * create_sane_arp_entry(arp_table_t *arp_table, char *ip_addr);
+static bool_t arp_entry_sane(arp_entry_t *arp_entry){
+    return arp_entry->is_sane;
+}
 
 
 
