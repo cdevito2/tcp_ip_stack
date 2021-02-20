@@ -54,6 +54,19 @@ display_graph_nodes(param_t *param, ser_buff_t *tlv_buf){
 
 
 /*General Validations*/
+static int 
+validate_if_up_down_status(char *value){
+
+    if(strncmp(value, "up", strlen("up")) == 0 && 
+        strlen("up") == strlen(value)){
+        return VALIDATION_SUCCESS;
+    }
+    else if(strncmp(value, "down", strlen("down")) == 0 && 
+            strlen("down") == strlen(value)){
+        return VALIDATION_SUCCESS;
+    }
+    return VALIDATION_FAILED;
+}
 int
 validate_node_extistence(char *node_name){
 
@@ -386,6 +399,7 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
    char *intf_name;
    unsigned int vlan_id;
    char *l2_mode_option;
+   char *if_up_down;
    int CMDCODE;
    tlv_struct_t *tlv = NULL;
    node_t *node;
@@ -403,6 +417,8 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
             vlan_id = atoi(tlv->value);
         else if(strncmp(tlv->leaf_id, "l2-mode-val", strlen("l2-mode-val")) == 0)
             l2_mode_option = tlv->value;
+        else if(strncmp(tlv->leaf_id,"if-up-down",strlen("if-up-down"))==0)
+            if_up_down = tlv->value;
         else
             assert(0);
     } TLV_LOOP_END;
@@ -415,6 +431,13 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
         return -1;
     }
     switch(CMDCODE){
+        case CMDCODE_CONF_INTF_UP_DOWN:
+            if(strncmp(if_up_down,"up",strlen("up")) == 0)
+                interface->intf_nw_props.is_up = TRUE;
+            else{
+                interface->intf_nw_props.is_up = FALSE;
+            }
+            break;
         case CMDCODE_INTF_CONFIG_L2_MODE:
             switch(enable_or_disable){
                 case CONFIG_ENABLE:
@@ -600,6 +623,13 @@ nw_init_cli(){
                          set_param_cmd_code(&vlan_id, CMDCODE_INTF_CONFIG_VLAN);
                     }   
                 }    
+                {
+                   /*config node <node-name> interface <if-name> <up|down>*/
+                   static param_t if_up_down_status;
+                   init_param(&if_up_down_status, LEAF, 0, intf_config_handler, validate_if_up_down_status, STRING, "if-up-down", "<up | down>");
+                   libcli_register_param(&if_name, &if_up_down_status);
+                   set_param_cmd_code(&if_up_down_status, CMDCODE_CONF_INTF_UP_DOWN);
+                }
             }
             
         }

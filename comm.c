@@ -74,7 +74,12 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
     if(!recv_intf){
         printf("Error: Pkt received on unknown unterface %s on node %s\n",recv_intf->if_name,receiving_node->node_name);
     }
-    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)(pkt_with_aux_data+IF_NAME_SIZE);
+
+
+    //add check to make sure interface is up
+    if(!IF_IS_UP(recv_intf)){
+        return;
+    }
     //invoke call to receive packet
     //note that pkt_with_aux_data right+shitfs the packet pointer to the start of data
     pkt_receive(receiving_node,recv_intf,pkt_with_aux_data+IF_NAME_SIZE,pkt_size - IF_NAME_SIZE);
@@ -136,11 +141,13 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
 int
 send_pkt_out(char *pkt, unsigned int pkt_size, 
              interface_t *interface){
-    printf("SENDING PKT\n");
     int rc = 0;
     node_t *sending_node = interface->att_node;
     node_t *nbr_node = get_nbr_node(interface);
     
+    if(!IF_IS_UP(interface)){
+        return 0;
+    }
     if(!nbr_node)
         return -1;
 

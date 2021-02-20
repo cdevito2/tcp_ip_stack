@@ -94,6 +94,8 @@ static inline void init_node_nw_prop(node_nw_prop_t *node_nw_prop){
 
 
 typedef struct intf_nw_props{
+
+    bool_t is_up;
     //every interface needs a mac address
     mac_add_t mac_add;
     intf_l2_mode_t intf_l2_mode; //if ip address configured this is set to unknown
@@ -114,6 +116,7 @@ typedef struct intf_nw_props{
 static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
     /* default init */
     intf_nw_props->mask =0;
+    intf_nw_props->is_up = TRUE;
     memset(intf_nw_props->ip_add.ip_addr,0,16);
     memset(intf_nw_props->mac_add.mac,0,sizeof(intf_nw_props->mac_add.mac));
     memset(intf_nw_props->vlans,0,sizeof(intf_nw_props->vlans));
@@ -126,6 +129,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 //create some shorthand macros
 
+#define IF_IS_UP(intf_ptr)  ((intf_ptr)->intf_nw_props.is_up == TRUE)
 #define IF_MAC(intf_ptr)    ((intf_ptr)->intf_nw_props.mac_add.mac)
 #define IF_IP(intf_ptr)     ((intf_ptr)->intf_nw_props.ip_add.ip_addr)
 #define NODE_LO_ADDR(node_ptr)      ((node_ptr)->node_nw_prop.lb_addr.ip_addr)

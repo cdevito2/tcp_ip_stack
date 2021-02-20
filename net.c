@@ -110,6 +110,8 @@ void dump_node_nw_props(node_t *node){
 
 void dump_intf_props(interface_t *interface){
     dump_interface(interface);
+
+    printf("\t If Status : %s\n", IF_IS_UP(interface) ? "UP" : "DOWN");
     if(interface->intf_nw_props.is_ipadd_config){
         printf("\t IP ADDR = %s/%u",IF_IP(interface),interface->intf_nw_props.mask);
 
