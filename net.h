@@ -107,6 +107,8 @@ typedef struct intf_nw_props{
     bool_t is_ipadd_config;
     unsigned int vlans[MAX_VLAN_MEMBERSHIP];
 
+    uint32_t pkt_recv;
+    uint32_t pkt_sent;
 }intf_nw_props_t;
 
 
@@ -122,6 +124,9 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
     memset(intf_nw_props->vlans,0,sizeof(intf_nw_props->vlans));
     intf_nw_props->is_ipadd_config = FALSE;
 
+    //interface statistics pkt recv and sent
+    intf_nw_props->pkt_recv = 0;
+    intf_nw_props->pkt_sent = 0;
 }
 
 
@@ -144,6 +149,8 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 //functions to define in net.c
+void dump_interface_stats(interface_t *interface);
+void dump_node_interface_stats(node_t *node);
 interface_t * node_get_marching_subnet_interface(node_t *node, char *ip_addr);
 unsigned int ap_addr_p_to_n(char *ip_addr);
 void ip_addr_n_to_p(unsigned int ip_addr, char *ip_addr_str);

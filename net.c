@@ -99,6 +99,31 @@ unsigned int convert_ip_from_str_to_int(char *str_ip_addr){
 
 
 
+
+void dump_interface_stats(interface_t *interface){
+    
+    printf("%s   ::  PktTx : %u, PktRx : %u",
+        interface->if_name, interface->intf_nw_props.pkt_sent,
+        interface->intf_nw_props.pkt_recv);
+}
+
+
+void dump_node_interface_stats(node_t *node){
+    interface_t *intf;
+    uint32_t i=0;
+    for(;i<MAX_INTF_PER_NODE;i++){
+        intf = node->intf[i];
+        if(!intf){
+            return;
+        }
+        dump_interface_stats(intf);
+        printf("\n");
+    }
+}
+
+
+
+
 void dump_node_nw_props(node_t *node){
     
     printf("\nNode Name = %s, udp_port_no = %u\n", node->node_name, node->udp_port_number);

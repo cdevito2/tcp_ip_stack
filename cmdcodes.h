@@ -34,5 +34,6 @@
 
 
 
+#define CMDCODE_SHOW_INTF_STATS     13     /*show node <node-name> interface statistics*/
 #define CMDCODE_CONF_INTF_UP_DOWN        26 /*config node <node-name> interface <if-name> <up|down>*/
 #endif

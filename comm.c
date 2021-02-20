@@ -80,6 +80,9 @@ static void _pkt_receive(node_t *receiving_node, char *pkt_with_aux_data, unsign
     if(!IF_IS_UP(recv_intf)){
         return;
     }
+
+
+    recv_intf->intf_nw_props.pkt_recv++;
     //invoke call to receive packet
     //note that pkt_with_aux_data right+shitfs the packet pointer to the start of data
     pkt_receive(receiving_node,recv_intf,pkt_with_aux_data+IF_NAME_SIZE,pkt_size - IF_NAME_SIZE);
@@ -178,10 +181,12 @@ send_pkt_out(char *pkt, unsigned int pkt_size,
 
     memcpy(pkt_with_aux_data + IF_NAME_SIZE, pkt, pkt_size);
 
-    ethernet_hdr_t *eth = (ethernet_hdr_t *)(pkt_with_aux_data + IF_NAME_SIZE);
     rc = _send_pkt_out(sock, pkt_with_aux_data, pkt_size + IF_NAME_SIZE, 
                         dst_udp_port_no);
 
+    if (rc > 0){
+        interface->intf_nw_props.pkt_sent++;
+    }
     close(sock);
     return rc; 
 }
