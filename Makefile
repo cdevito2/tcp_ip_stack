@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-g
-TARGET=tcpstack.exe
+TARGET=tcpstack.exe CommandParser/libcli.a pkt_gen.exe
 LIBS=-lpthread -L ./CommandParser -lcli
 
 
@@ -16,6 +16,12 @@ OBJS=gluethread/glthread.o\
 		  nwcli.o\
 		  utils.o\
 		  Layer2/l2switch.o
+
+pkt_gen.exe:pkt_gen.o utils.o
+	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
+
+pkt_gen.o:pkt_gen.c
+	${CC} ${CFLAGS} -c pkt_gen.c -o pkt_gen.o
 
 tcpstack.exe:testapp.o ${OBJS} CommandParser/libcli.a
 	${CC} ${CFLAGS} testapp.o ${OBJS} -o tcpstack.exe ${LIBS}

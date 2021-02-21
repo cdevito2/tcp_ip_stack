@@ -17,8 +17,9 @@
  */
 #ifndef __LAYER3__
 #define __LAYER3__
-#include<gluethread/glthread.h>
 
+#include <stdint.h>
+#include "../tcpconst.h"
 
 //IP header 
 //total length constant 20 byte

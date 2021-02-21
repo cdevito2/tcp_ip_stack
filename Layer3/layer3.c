@@ -359,7 +359,6 @@ void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int pro
 static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface, ip_hdr_t *pkt, unsigned int pkt_size){
     
 
-    printf("IN LAYER3 rrecv from bottom\n");
     char *l4_hdr;
     char *l5_hdr;
     //step 1 : lookup routing table for matching entry

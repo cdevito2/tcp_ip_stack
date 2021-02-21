@@ -700,7 +700,6 @@ l2_forward_ip_packet(node_t *node, unsigned int next_hop_ip,
 static void layer2_pkt_receive_from_top(node_t *node, unsigned int next_hop_ip, char *outgoing_intf, char *pkt, unsigned int pkt_size, int protocol_number){
     
     //add assert here mabye in future
-    printf("RECVD FROM TOP\n");
     //check protocol layer is ip protocol
     if(protocol_number = ETH_IP){
         //expand packet to make room for eth hdr
