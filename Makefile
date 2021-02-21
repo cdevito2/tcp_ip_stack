@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-g
-TARGET=test.exe
+TARGET=tcpstack.exe
 LIBS=-lpthread -L ./CommandParser -lcli
 
 
@@ -17,8 +17,8 @@ OBJS=gluethread/glthread.o\
 		  utils.o\
 		  Layer2/l2switch.o
 
-test.exe:testapp.o ${OBJS} CommandParser/libcli.a
-	${CC} ${CFLAGS} testapp.o ${OBJS} -o test.exe ${LIBS}
+tcpstack.exe:testapp.o ${OBJS} CommandParser/libcli.a
+	${CC} ${CFLAGS} testapp.o ${OBJS} -o tcpstack.exe ${LIBS}
 
 testapp.o:testapp.c
 	${CC} ${CFLAGS} -c testapp.c -o testapp.o
