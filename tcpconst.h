@@ -29,5 +29,5 @@
 #define VLAN_8021Q_PROTO 0x8100
 #define ETH_IP  0x8000
 #define ICMP_PRO    1
-
+#define MAX_NXT_HOPS 4
 #endif

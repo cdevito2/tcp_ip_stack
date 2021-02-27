@@ -1,20 +1,19 @@
 CC=gcc
 CFLAGS=-g
-TARGET=tcpstack.exe CommandParser/libcli.a pkt_gen.exe
+TARGET:tcpstack.exe CommandParser/libcli.a pkt_gen.exe
 LIBS=-lpthread -L ./CommandParser -lcli
-OBJS=gluethread/glthread.o\
-		  graph.o\
-		  topologies.o\
-		  net.o\
-		  comm.o\
-		  Layer2/layer2.o\
-		  Layer3/layer3.o\
-		  Layer5/layer5.o\
-		  Layer5/ping.o\
-		  nwcli.o\
-		  utils.o\
-		  Layer2/l2switch.o\
-		  Layer5/spf_algo/spf.o
+OBJS=gluethread/glthread.o \
+		  graph.o 		   \
+		  topologies.o	   \
+		  net.o			   \
+		  comm.o		   \
+		  Layer2/layer2.o  \
+		  Layer3/layer3.o  \
+		  Layer5/layer5.o  \
+		  nwcli.o		   \
+		  utils.o		   \
+		  Layer2/l2switch.o \
+		  Layer5/spf_algo/spf.o \
 
 pkt_gen.exe:pkt_gen.o utils.o
 	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
@@ -40,42 +39,45 @@ topologies.o:topologies.c
 net.o:net.c
 	${CC} ${CFLAGS} -c -I . net.c -o net.o
 
-nwcli.o:nwcli.c
-	${CC} ${CFLAGS} -c -I . nwcli.c -o nwcli.o
-
 comm.o:comm.c
-	${CC} ${CFLAGS} -c -I . comm.c  -o comm.o
-
-utils.o:utils.c
-	${CC} ${CFLAGS} -c -I . utils.c -o utils.o
+	${CC} ${CFLAGS} -c -I . comm.c -o comm.o
 
 Layer2/layer2.o:Layer2/layer2.c
 	${CC} ${CFLAGS} -c -I . Layer2/layer2.c -o Layer2/layer2.o
 
+Layer2/l2switch.o:Layer2/l2switch.c
+	${CC} ${CFLAGS} -c -I . Layer2/l2switch.c -o Layer2/l2switch.o
+
 Layer3/layer3.o:Layer3/layer3.c
 	${CC} ${CFLAGS} -c -I . Layer3/layer3.c -o Layer3/layer3.o
-
-Layer5/layer5.o:Layer5/layer5.c
-	${CC} ${CFLAGS} -c -I . Layer5/layer5.c -o Layer5/layer5.o
-
-Layer5/ping.o:Layer5/ping.c
-	${CC} ${CFLAGS} -c -I . Layer5/ping.c -o Layer5/ping.o
-
-Layer2/l2switch.o:Layer2/l2switch.c
-	${CC} ${CFLAGS} -c -I . Layer2/l2switch.c -o Layer2/l2switch.o	 
 
 Layer5/spf_algo/spf.o:Layer5/spf_algo/spf.c
 	${CC} ${CFLAGS} -c -I . Layer5/spf_algo/spf.c -o Layer5/spf_algo/spf.o
 
+Layer5/layer5.o:Layer5/layer5.c
+	${CC} ${CFLAGS} -c -I . Layer5/layer5.c -o Layer5/layer5.o
+
+nwcli.o:nwcli.c
+	${CC} ${CFLAGS} -c -I . nwcli.c  -o nwcli.o
+
+utils.o:utils.c
+	${CC} ${CFLAGS} -c -I . utils.c -o utils.o
+
+
 CommandParser/libcli.a:
 	(cd CommandParser; make)
-
 clean:
-	rm *.o
-	rm gluethread/glthread.o
-	rm *exe
-	(cd CommandParser; make clean)
-
+	rm -f *.o
+	rm -f gluethread/glthread.o
+	rm -f *exe
+	rm -f Layer2/*.o
+	rm -f Layer3/*.o
+	rm -f Layer5/*.o
+	rm -f Layer5/spf_algo/*.o
 all:
 	make
 	(cd CommandParser; make)
+
+cleanall:
+	make clean
+	(cd CommandParser; make clean)

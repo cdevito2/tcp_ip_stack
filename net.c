@@ -98,6 +98,46 @@ unsigned int convert_ip_from_str_to_int(char *str_ip_addr){
 }
 
 
+bool_t is_interface_l3_bidirectional(interface_t *interface){
+    //if L2 mode return false
+    if(IF_L2_MODE(interface) == ACCESS || IF_L2_MODE(interface) == TRUNK){
+        return FALSE;
+    }
+    //if no ip address return false
+    if(!IS_INTF_L3_MODE(interface)){
+        return FALSE;
+    }
+
+    //now get the other interface
+    interface_t *other_interface = &interface->link->intf1 == interface ? \
+            &interface->link->intf2 : &interface->link->intf1;
+    
+    if(!other_interface){
+        return FALSE;
+    }
+
+    //check that the interfaces are up
+    if(!IF_IS_UP(interface) || !IF_IS_UP(other_interface)){
+        return FALSE;
+    }
+
+    //check that the other interface is also in L3 mode
+    if(IF_L2_MODE(other_interface) == ACCESS || IF_L2_MODE(other_interface) == TRUNK){
+        return FALSE;
+    }
+
+    if(!IS_INTF_L3_MODE(other_interface)){
+        return FALSE;
+    }
+
+    //now make sure the 2 interfaces are in the same subnet
+    if(!(is_same_subnet(IF_IP(interface),IF_MASK(interface), IF_IP(other_interface)) && is_same_subnet(IF_IP(other_interface),IF_MASK(other_interface),IF_IP(interface)))){
+        return FALSE;
+    }
+    return TRUE;
+}
+
+
 
 
 void dump_interface_stats(interface_t *interface){
@@ -120,6 +160,8 @@ void dump_node_interface_stats(node_t *node){
         printf("\n");
     }
 }
+
+
 
 
 

@@ -147,6 +147,8 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 
+bool_t is_interface_l3_bidirectional(interface_t *interface);
+
 
 //functions to define in net.c
 void dump_interface_stats(interface_t *interface);

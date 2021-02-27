@@ -86,7 +86,11 @@ typedef struct rt_table_{
     glthread_t route_list;
 }rt_table_t;
 
-
+typedef struct nexthop_{
+    char gw_ip[16];
+    interface_t *oif;
+    uint32_t ref_count;
+}nexthop_t;
 
 
 typedef struct l3_route_{

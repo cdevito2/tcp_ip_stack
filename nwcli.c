@@ -568,6 +568,13 @@ nw_init_cli(){
                     }
 
                  }
+                 {
+                    /*show node <node-name> spf-result*/
+                    static param_t spf_result;
+                    init_param(&spf_result, CMD, "spf-result", spf_algo_handler, 0, INVALID, 0, "SPF Results");
+                    libcli_register_param(&node_name, &spf_result);
+                    set_param_cmd_code(&spf_result, CMDCODE_SHOW_SPF_RESULTS);
+                 }
              }
          } 
     }
@@ -619,6 +626,13 @@ nw_init_cli(){
                     libcli_register_param(&resolve_arp, &ip_addr);
                     set_param_cmd_code(&ip_addr, CMDCODE_RUN_ARP);
                 }
+            }
+            {
+                /*run node <node-name> spf*/
+                static param_t spf;
+                init_param(&spf, CMD, "spf", spf_algo_handler, 0, INVALID, 0, "Trigger SPF");
+                libcli_register_param(&node_name, &spf);
+                set_param_cmd_code(&spf, CMDCODE_RUN_SPF);
             }
         }
     }

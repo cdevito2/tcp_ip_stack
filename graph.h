@@ -61,6 +61,7 @@ typedef struct link_{
     unsigned int cost;
 }link_t;
 
+typedef struct spf_data_ spf_data_t;
 struct node_{
     char node_name[NODE_NAME_SIZE];
     interface_t *intf[MAX_INTF_PER_NODE];
@@ -68,6 +69,7 @@ struct node_{
     node_nw_prop_t node_nw_prop; //struct to hold networking properties
     unsigned int udp_port_number;
     int udp_sock_fd;
+    spf_data_t *spf_data;
 };
 
 
