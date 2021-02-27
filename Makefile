@@ -2,8 +2,6 @@ CC=gcc
 CFLAGS=-g
 TARGET=tcpstack.exe CommandParser/libcli.a pkt_gen.exe
 LIBS=-lpthread -L ./CommandParser -lcli
-
-
 OBJS=gluethread/glthread.o\
 		  graph.o\
 		  topologies.o\
@@ -15,7 +13,8 @@ OBJS=gluethread/glthread.o\
 		  Layer5/ping.o\
 		  nwcli.o\
 		  utils.o\
-		  Layer2/l2switch.o
+		  Layer2/l2switch.o\
+		  Layer5/spf_algo/spf.o
 
 pkt_gen.exe:pkt_gen.o utils.o
 	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
@@ -64,6 +63,9 @@ Layer5/ping.o:Layer5/ping.c
 
 Layer2/l2switch.o:Layer2/l2switch.c
 	${CC} ${CFLAGS} -c -I . Layer2/l2switch.c -o Layer2/l2switch.o	 
+
+Layer5/spf_algo/spf.o:Layer5/spf_algo/spf.c
+	${CC} ${CFLAGS} -c -I . Layer5/spf_algo/spf.c -o Layer5/spf_algo/spf.o
 
 CommandParser/libcli.a:
 	(cd CommandParser; make)
