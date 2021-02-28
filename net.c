@@ -98,6 +98,22 @@ unsigned int convert_ip_from_str_to_int(char *str_ip_addr){
 }
 
 
+
+bool_t is_same_subnet(char *ip_addr, char mask, char *other_ip_addr){
+    char intf_subnet[16];
+    char subnet2[16];
+
+    memset(intf_subnet,0,16);
+    memset(subnet2,0,16);
+    apply_mask(ip_addr,mask,intf_subnet);
+    apply_mask(other_ip_addr,mask,subnet2);
+
+    if(strncmp(intf_subnet,subnet2,16) == 0){
+        return TRUE;
+    }
+    return FALSE;
+}
+
 bool_t is_interface_l3_bidirectional(interface_t *interface){
     //if L2 mode return false
     if(IF_L2_MODE(interface) == ACCESS || IF_L2_MODE(interface) == TRUNK){

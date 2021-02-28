@@ -21,6 +21,8 @@
 #include "../../tcp_public.h"
 
 
+#define INFINITE_METRIC 0xFFFFFFFF
+
 extern graph_t *topo;
 
 
@@ -42,6 +44,14 @@ typedef struct spf_result_{
     glthread_t spf_res_glue;
 }spf_result_t;
 GLTHREAD_TO_STRUCT(spf_res_glue_to_spf_result,spf_result_t,spf_res_glue);
+
+
+#define spf_data_offset_from_priority_thread_glue \
+    ((size_t)&(((spf_dat_t *)0)->priority_thread_glue))
+
+
+#define SPF_METRIC(nodeptr) (nodeptr->spf_data->spf_metric)
+
 
 
 void spf_flush_nexthops(nexthop_t **nexthop){
@@ -115,12 +125,59 @@ static bool_t spf_is_nexthop_exist(nexthop_t **nexthop_arr, nexthop_t *nxthop){
 
 
 static int spf_union_nexthops_arrays(nexthop_t **src, nexthop_t **dst){
+    int i=0;
+    int j=0;
+    int copied_count=0;
+    while(j<MAX_NXT_HOPS && dst[j]){
+        j++;
+    }
 
+    if(j==MAX_NXT_HOPS){
+        return 0;
+    }
+    
+    for (; i<MAX_NXT_HOPS && j<MAX_NXT_HOPS;i++,j++){
+        if(src[i] && spf_is_nexthop_exist(dst,src[i]) == FALSE){
+            dst[j] = src[i];
+            dst[j]->ref_count++;
+            copied_count++;
+        }
+
+    }
+    return copied_count;
 }
 
 static int spf_comparison_fn(void *data1, void *data2){
+    spf_data_t *spf_data_1 = (spf_data_t *)data1;
+    spf_data_t *spf_data_2 = (spf_data_t *)data2;
+    if(spf_data_1->spf_metric < spf_data_2->spf_metric){
+        return -1;
+    }
+    if(spf_data_1->spf_metric > spf_data_2->spf_metric){
+        return 1;
+    }
+    return 0;
+}
+
+
+static spf_result_t *spf_lookup_spf_result_by_node(node_t *spf_root, node_t *node){
+    //first arg is root node for spf, second arg is some other node in topology
+    //iterate thrpugh spf result
+    glthread_t *curr;
+    spf_result_t *spf_result;
+    spf_data_t *curr_spf_data;
+
+    ITERATE_GLTHREAD_BEGIN(&spf_root->spf_data->spf_result_head,curr){
+        spf_result = spf_res_glue_to_spf_result(curr);
+        if(spf_result->node == node){
+            return spf_result;
+        }
+    }ITERATE_GLTHREAD_END(&spf_root->spf_data->spf_result_head,curr);
+    return NULL;
 
 }
+
+
 
 void compute_spf(node_t *spf_root){
     printf("%s() called ...\n",__FUNCTION__);
@@ -132,9 +189,9 @@ static void show_spf_results(node_t *node){
 
 
 
-int spf_algo_handler(param_t *param, ser_buff_t *tlv_buff,op_mode enable_or_disable){
+int spf_algo_handler(param_t *param, ser_buff_t *tlv_buf,op_mode enable_or_disable){
     int CMDCODE;
-    node_t *node, 
+    node_t *node; 
     char *node_name;
     CMDCODE = EXTRACT_CMD_CODE(tlv_buf);
     tlv_struct_t *tlv = NULL;

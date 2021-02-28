@@ -35,7 +35,7 @@
 #include "CommandParser/libcli.h"
 #include "CommandParser/cmdtlv.h"
 #include "cmdcodes.h"
-
+#include "Layer5/app_handlers.h"
 extern graph_t *topo;
 
 /* Display functions when user presses ?*/
@@ -245,9 +245,6 @@ arp_handler(param_t *param, ser_buff_t *tlv_buf,
 /*Layer 3 Commands*/
 extern void
 layer5_ping_fn(node_t *node, char *dst_ip_addr);
-extern void
-layer3_ero_ping_fn(node_t *node, char *dst_ip_addr,
-                            char *ero_ip_address);
 
 static int
 ping_handler(param_t *param, ser_buff_t *tlv_buf, op_mode enable_or_disable){

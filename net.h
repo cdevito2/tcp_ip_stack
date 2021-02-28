@@ -134,6 +134,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 //create some shorthand macros
 
+#define IF_MASK(intf_ptr)   ((intf_ptr)->intf_nw_props.mask)
 #define IF_IS_UP(intf_ptr)  ((intf_ptr)->intf_nw_props.is_up == TRUE)
 #define IF_MAC(intf_ptr)    ((intf_ptr)->intf_nw_props.mac_add.mac)
 #define IF_IP(intf_ptr)     ((intf_ptr)->intf_nw_props.ip_add.ip_addr)
@@ -148,7 +149,7 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 bool_t is_interface_l3_bidirectional(interface_t *interface);
-
+bool_t is_same_subnet(char *ip_addr, char mask, char *other_ip_addr);
 
 //functions to define in net.c
 void dump_interface_stats(interface_t *interface);

@@ -35,6 +35,7 @@
 #include "CommandParser/libcli.h"
 #include "CommandParser/cmdtlv.h"
 #include "cmdcodes.h"
+#include "Layer5/app_handlers.h"
 
 extern graph_t * topo;
 
