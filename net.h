@@ -147,6 +147,23 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 //macro to return true if interface is in L3 mode or not, false if in L2 mode
 
 
+#define ITERATE_NODE_NBRS_BEGIN(node_ptr , nbr_ptr, oif_ptr, ip_addr_ptr)\
+    do{                                                                  \
+        int i =0;                                                        \
+        interface_t *other_intf;                                         \
+        for(i=0;i<MAX_INTF_PER_NODE;i++){                                \
+            oif_ptr = node->intf[i];                                     \
+            if(!oif_ptr)continue;                                        \
+            other_intf = &oif_ptr->link->intf1 == oif_ptr ?              \
+            &oif_ptr->link->intf2 : &oif_ptr->link->intf1;               \                                    if(!other_intf)continue;                                     \
+            nbr_ptr = get_nbr_node(oif_ptr);                                 \
+            ip_addr_ptr = IF_IP(nbr_ptr);                                \
+#define ITERATE_NODE_NBRS_END(node_ptr,nbr_ptr,oif_ptr,ip_addr_ptr)   } }while(0);
+
+
+
+
+
 
 bool_t is_interface_l3_bidirectional(interface_t *interface);
 bool_t is_same_subnet(char *ip_addr, char mask, char *other_ip_addr);
