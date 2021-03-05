@@ -93,6 +93,8 @@ glthread_priority_insert(glthread_t *base_glthread,
                          int offset);
 
 
+glthread_t *
+dequeue_glthread_first(glthread_t *base_glthread);
 #if 0
 void *
 gl_thread_search(glthread_t *base_glthread,

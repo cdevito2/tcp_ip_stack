@@ -186,7 +186,19 @@ glthread_priority_insert(glthread_t *base_glthread,
 
     /*Add in the end*/
     glthread_add_next(prev, glthread);
-} 
+}
+
+
+
+glthread_t *dequeue_glthread_first(glthread_t *base_glthread){
+    glthread_t *temp;
+    if(!base_glthread->right){
+        return NULL;
+    }
+    temp = base_glthread->right;
+    remove_glthread(temp);
+    return temp;
+}
 
 #if 0
 void *

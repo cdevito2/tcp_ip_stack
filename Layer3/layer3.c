@@ -204,7 +204,7 @@ l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table,unsigned int dest_ip){
 
 
 
-void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif){
+void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif,uint32_t spf_metric){
     
     
     

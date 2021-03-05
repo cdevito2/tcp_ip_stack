@@ -47,10 +47,33 @@ GLTHREAD_TO_STRUCT(spf_res_glue_to_spf_result,spf_result_t,spf_res_glue);
 
 
 #define spf_data_offset_from_priority_thread_glue \
-    ((size_t)&(((spf_dat_t *)0)->priority_thread_glue))
+    ((size_t)&(((spf_data_t *)0)->priority_thread_glue))
 
 
 #define SPF_METRIC(nodeptr) (nodeptr->spf_data->spf_metric)
+
+void spf_flush_nexthops(nexthop_t **nexthop){
+    int i=0;
+    if(!nexthop){
+        return;
+    }
+    for (;i<MAX_NXT_HOPS;i++){
+        if(nexthop[i]){
+            assert(nexthop[i]->ref_count);
+            nexthop[i]->ref_count--;
+            if(nexthop[i]->ref_count ==0){
+                free(nexthop[i]);
+            }
+            nexthop[i] = NULL;
+        }
+    }
+}
+
+static inline void free_spf_result(spf_result_t *spf_result){
+    spf_flush_nexthops(spf_result->nexthops);
+    remove_glthread(&spf_result->spf_res_glue);
+    free(spf_result);
+}
 
 
 static void init_node_spf_data(node_t *node, bool_t delete_spf_result){
@@ -76,29 +99,6 @@ static void init_node_spf_data(node_t *node, bool_t delete_spf_result){
 
 
 
-void spf_flush_nexthops(nexthop_t **nexthop){
-    int i=0;
-    if(!nexthop){
-        return;
-    }
-    for (;i<MAX_NXT_HOPS;i++){
-        if(nexthop[i]){
-            assert(nexthop[i]->ref_count);
-            nexthop[i]->ref_count--;
-            if(nexthop[i]->ref_count ==0){
-                free(nexthop[i]);
-            }
-            nexthop[i] = NULL;
-        }
-    }
-}
-
-
-static inline void free_spf_result(spf_result_t *spf_result){
-    spf_flush_nexthops(spf_result->nexthops);
-    remove_glthread(&spf_result->spf_res_glue);
-    free(spf_result);
-}
 
 static nexthop_t * create_new_nexthop(interface_t *oif){
     nexthop_t *nexthop = calloc(1,sizeof(nexthop_t));
@@ -199,7 +199,33 @@ static spf_result_t *spf_lookup_spf_result_by_node(node_t *spf_root, node_t *nod
 
 }
 
+static void spf_record_result(node_t *spf_root, node_t *processed_node){
+    //processed node is the node dequeued
+    //shortest path has been calculated for that node
+    assert(!spf_lookup_spf_result_by_node(spf_root, processed_node));
 
+    spf_result_t *spf_result = calloc(1,sizeof(spf_result_t));
+
+    //we record the node itself, the shortest path cost to the node
+    //and the set of nexthops for this node
+    spf_result->node = processed_node;
+    spf_result->spf_metric = processed_node->spf_data->spf_metric;
+
+    spf_union_nexthops_arrays(processed_node->spf_data->nexthops,spf_result->nexthops);
+    #if SPF_LOGGING
+    printf("root : %s : Event : Result Recorded for node %s, "
+            "Next hops : %s, spf_metric = %u\n",
+            spf_root->node_name, processed_node->node_name,
+            nexthops_str(spf_result->nexthops),
+            spf_result->spf_metric);
+    #endif
+
+
+    //add the result datastructure for processed node to the spf result table
+    init_glthread(&spf_result->spf_res_glue);
+    glthread_add_next(&spf_root->spf_data->spf_result_head,&spf_result->spf_res_glue);
+
+}
 
 void initialize_direct_nbrs(node_t *spf_root){
     //iterate through all nexthops
@@ -229,7 +255,132 @@ void initialize_direct_nbrs(node_t *spf_root){
     }ITERATE_NODE_NBRS_END(spf_root,nbr,oif,nxt_hop_ip);
 }
 
+
+
+static void spf_explore_nbrs(node_t *spf_root, node_t *curr_node, glthread_t *priority_list){
+    //curr node is the current node being explored
+    node_t *nbr;
+    interface_t *oif;
+    char *nxt_hop_ip = NULL;
+    #if SPF_LOGGING
+    printf("root : %s : Event : Nbr Exploration Start for Node : %s\n",
+            spf_root->node_name, curr_node->node_name);
+    #endif
+
+    //iterate all nbrs of the current node
+    ITERATE_NODE_NBRS_BEGIN(curr_node,nbr,oif,nxt_hop_ip){
+
+        #if SPF_LOGGING
+        printf("root : %s : Event : For Node %s , Processing nbr %s\n",
+                spf_root->node_name, curr_node->node_name, 
+                nbr->node_name);
+        #endif
+        //check if nbr is eligible
+        
+        if(!is_interface_l3_bidirectional(oif)) continue;
+
+        #if SPF_LOGGING
+        printf("root : %s : Event : Testing Inequality : " 
+                " spf_metric(%s, %u) + link cost(%u) < spf_metric(%s, %u)\n",
+                spf_root->node_name, curr_node->node_name, 
+                curr_node->curr_spf_data->spf_metric, 
+                get_link_cost(oif), nbr->node_name, nbr->spf_data->spf_metric);
+        #endif
+    
+        if(SPF_METRIC(curr_node) + get_link_cost(oif) < SPF_METRIC(nbr)){
+            //we have found a nbr node reachable by a better cost
+            //remove from PQ and add bacl
+
+            //remove obsolete nexthops
+            spf_flush_nexthops(nbr->spf_data->nexthops);
+
+            //copy new set of nexthops to nbr
+            spf_union_nexthops_arrays(curr_node->spf_data->nexthops,nbr->spf_data->nexthops);
+
+            //update shortest path
+            SPF_METRIC(nbr) = SPF_METRIC(curr_node) + get_link_cost(oif);
+
+            //remove from PQ and readd if it is already in PQ
+            if(!IS_GLTHREAD_LIST_EMPTY(&nbr->spf_data->priority_thread_glue)){
+                #if SPF_LOGGING
+                printf("root : %s : Event : Node %s Already On priority Queue\n",
+                        spf_root->node_name, nbr->node_name);
+                #endif
+                remove_glthread(&nbr->spf_data->priority_thread_glue);
+            }
+            #if SPF_LOGGING
+            printf("root : %s : Event : Node %s inserted into priority Queue "
+            "with spf_metric = %u\n",
+                    spf_root->node_name,  nbr->node_name, nbr->spf_data->spf_metric);
+            #endif
+            glthread_priority_insert(priority_list, 
+                    &nbr->spf_data->priority_thread_glue,
+                    spf_comparison_fn, 
+                    spf_data_offset_from_priority_thread_glue);
+        }
+
+
+        //case 2 - ECMP CASE
+        else if(SPF_METRIC(curr_node) + get_link_cost(oif) == SPF_METRIC(nbr)){
+            //combine all netxtophs
+            #if SPF_LOGGING
+            printf("root : %s : Event : Primary Nexthops Union of Current Node"
+                    " %s(%s) with Nbr Node %s(%s)\n",
+                    spf_root->node_name,  curr_node->node_name, 
+                    nexthops_str(curr_node->spf_data->nexthops),
+                    nbr->node_name, nexthops_str(nbr->spf_data->nexthops));
+            #endif
+            spf_union_nexthops_arrays(curr_node->spf_data->nexthops,nbr->spf_data->nexthops);
+        }
+    
+    }ITERATE_NODE_NBRS_END(curr_node,nbr,oif,nxt_hop_ip);
+
+
+    #if SPF_LOGGING
+    printf("root : %s : Event : Node %s has been processed, nexthops %s\n",
+            spf_root->node_name, curr_node->node_name, 
+            nexthops_str(curr_node->spf_data->nexthops));
+    #endif
+    /* We are done processing the curr_node, remove its nexthops to lower the
+     * ref count*/
+    spf_flush_nexthops(curr_node->spf_data->nexthops); 
+
+}
+
+
+static int spf_install_routes(node_t *spf_root){
+    rt_table_t *rt_table = NODE_RT_TABLE(spf_root);
+
+    //clear all routes except direct ones
+    clear_rt_table(rt_table);
+
+    //iterate over spf results and install routes for loopback aadrs of all router nodes
+
+    int i =0;
+    int count = 0;
+    glthread_t *curr;
+    spf_result_t *spf_result;
+    nexthop_t *nexthop = NULL;
+
+    ITERATE_GLTHREAD_BEGIN(&spf_root->spf_data->spf_result_head,curr){
+        spf_result = spf_res_glue_to_spf_result(curr);
+        for(i=0;i<MAX_NXT_HOPS;i++){
+            nexthop = spf_result->nexthops[i];
+            if(!nexthop)continue;
+
+            //add the route
+            rt_table_add_route(rt_table,NODE_LO_ADDR(spf_result->node),32,
+            nexthop->gw_ip,nexthop->oif,spf_result->spf_metric);
+            count++;
+        }
+    }ITERATE_GLTHREAD_END(&spf_root->spf_data->spf_result_head,curr);
+    return count;
+}
+
+
+
 static void compute_spf(node_t *spf_root){
+
     //INIT - PART 1
     node_t *node,*nbr;
     interface_t *oif;
@@ -243,31 +394,86 @@ static void compute_spf(node_t *spf_root){
     //remove nodes from PQ
     //flush nexthops if any
     
-
     //iterate through all nodes and call init spf function
-    ITERATE_GLTHEAD_BEGIN(&topo->node_list,curr){
+    ITERATE_GLTHREAD_BEGIN(&topo->node_list, curr){
+
         node = graph_glue_to_node(curr);
-        if(node==spf_root){
-            continue;//init function already called for this node
-        }
-        init_node_spf_data(node,FALSE);//spf result list only deleted for root node
-    }ITERATE_GLTHREAD_END(&topo->node_list,curr);
+        if(node == spf_root) continue;
+        init_node_spf_data(node, FALSE);
+    } ITERATE_GLTHREAD_END(&topo->node_list, curr);
 
     //PART 2- compute nexthops
-    initialize_direct_nbrs(node_t *spf_root);
+    initialize_direct_nbrs(spf_root);
 
     //PART 3 - initialize PQ and add SPF root
     
-    glthread_t priority_lst;
+    glthread_t priority_list;
     init_glthread(&priority_list);
-    glthread_priority_insert(&priority_list,&spf_root->spf_data->priority_thread_glue,spf_comparison_fn,spf_data_offset_from_priority_thread_glue);
+    glthread_priority_insert(&priority_list,
+        &spf_root->spf_data->priority_thread_glue,
+        spf_comparison_fn,
+        spf_data_offset_from_priority_thread_glue);
+
+
 
 
     //EXECUTION PHASE
-    //
+    while(!IS_GLTHREAD_LIST_EMPTY(&priority_list)){
+        //dequeue first in the queue
+        curr = dequeue_glthread_first(&priority_list);
+        //check if its the root
+        curr_spf_data = priority_thread_glue_to_spf_data(curr);
+
+        if(curr_spf_data->node == spf_root){
+            //for every eligible nbor not in PQ push to PQ
+            ITERATE_NODE_NBRS_BEGIN(curr_spf_data->node,nbr,oif,nxt_hop_ip){
+                if(!is_interface_l3_bidirectional(oif))continue;
+
+                if(IS_GLTHREAD_LIST_EMPTY(&nbr->spf_data->priority_thread_glue)){
+                    #if SPF_LOGGING
+                    printf("root : %s : Event : Processing Direct Nbr %s\n", 
+                        spf_root->node_name, nbr->node_name);
+                    #endif
+                    //add nbr to queue if they are not already in it
+                    glthread_priority_insert(&priority_list, 
+                            &nbr->spf_data->priority_thread_glue,
+                            spf_comparison_fn, 
+                            spf_data_offset_from_priority_thread_glue);
+
+                    #if SPF_LOGGING
+                    printf("root : %s : Event : Direct Nbr %s added to priority Queue\n",
+                            spf_root->node_name, nbr->node_name);
+                    #endif
+                    
+                }
+            }ITERATE_NODE_NBRS_END(curr_spf_data->node,nbr,oif,nxt_hop_ip);
+            #if SPF_LOGGING
+            printf("root : %s : Event : Root %s Processing Finished\n", 
+                    spf_root->node_name, curr_spf_data->node->node_name);
+            #endif
+            continue;
+        }
+
+        //step 5- node removed from PQ is not root - record result for node N
+        spf_record_result(spf_root,curr_spf_data->node);
+        
+        //step 6 - explore NBRS of the removed node
+        spf_explore_nbrs(spf_root,curr_spf_data->node,&priority_list);
+    }
 
 
 
+
+
+
+    //step 7 - calculate rputing table from spf result of spf root
+    int count = spf_install_routes(spf_root);
+
+
+    #if SPF_LOGGING
+    printf("root : %s : Event : Route Installation Count = %d\n", 
+            spf_root->node_name, count);
+    #endif
 }
 
 static void show_spf_results(node_t *node){
