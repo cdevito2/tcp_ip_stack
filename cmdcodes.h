@@ -21,9 +21,8 @@
 
 #define CMDCODE_SHOW_NW_TOPOLOGY     1
 #define CMDCODE_PING                 2
-#define CMDCODE_RUN_ARP              4
 #define CMDCODE_SHOW_NODE_ARP_TABLE  3
-
+#define CMDCODE_RUN_ARP              4
 #define CMDCODE_INTF_CONFIG_L2_MODE 5   /*config node <node-name> interface <intf-name> l2mode <access|trunk>*/
 #define CMDCODE_INTF_CONFIG_IP_ADDR 6   /*config node <node-name> interface <intf-name> ip-address <ip-address> <mask>*/
 #define CMDCODE_INTF_CONFIG_VLAN    7   /*config node <node-name> interface <intf-name> vlan <vlan-id>*/
@@ -37,5 +36,7 @@
 #define CMDCODE_SHOW_INTF_STATS     13     /*show node <node-name> interface statistics*/
 #define CMDCODE_RUN_SPF             18  /*run node <node-name> spf*/
 #define CMDCODE_SHOW_SPF_RESULTS    19  /*show node <node-name> spf-results*/
+#define CMDCODE_RUN_SPF_ALL         20  /* run spf all */
 #define CMDCODE_CONF_INTF_UP_DOWN        26 /*config node <node-name> interface <if-name> <up|down>*/
+#define CMDCODE_INTF_CONFIG_METRIC       33 /*config node <node-name> interface <if-name> metric <metric-val>*/
 #endif

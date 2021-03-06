@@ -477,9 +477,53 @@ static void compute_spf(node_t *spf_root){
 }
 
 static void show_spf_results(node_t *node){
-    printf("%s() called ...\n",__FUNCTION__);
+    int i=0,j=0;
+    glthread_t *curr;
+    interface_t *oif = NULL;
+    spf_result_t *res = NULL;
+    printf("\nSPF run results for node = %s\n", node->node_name);
+
+    //loop through the nodes spf results list
+    ITERATE_GLTHREAD_BEGIN(&node->spf_data->spf_result_head,curr){
+        res = spf_res_glue_to_spf_result(curr);
+
+        //print out the information for each node in the spf res linked list
+        printf("DEST : %-10s spf_metric : %-6u", res->node->node_name, res->spf_metric);
+        printf(" Nxt Hop : ");
+
+        j = 0;
+        //loop through all possible nexthops
+        for(i=0;i<MAX_NXT_HOPS;i++,j++){
+            if(!res->nexthops[i])continue;
+
+            oif = res->nexthops[i]->oif;
+            if(j == 0){
+                printf("%-8s       OIF : %-7s    gateway : %-16s ref_count = %u\n",
+                        nexthop_node_name(res->nexthops[i]),
+                        oif->if_name, res->nexthops[i]->gw_ip, 
+                        res->nexthops[i]->ref_count);
+            }
+            else{
+                printf("                                              : "
+                        "%-8s       OIF : %-7s    gateway : %-16s ref_count = %u\n",
+                        nexthop_node_name(res->nexthops[i]),
+                        oif->if_name, res->nexthops[i]->gw_ip, 
+                        res->nexthops[i]->ref_count);
+            }
+        }
+
+    }ITERATE_GLTHREAD_END(&node->spf_data->spf_result_head,curr);
 }
 
+
+
+static void compute_spf_all_routers(graph_t *topo){
+    glthread_t *curr;
+    ITERATE_GLTHREAD_BEGIN(&topo->node_list,curr){
+        node_t *node = graph_glue_to_node(curr);
+        compute_spf(node);
+    }ITERATE_GLTHREAD_END(&topo->node_list,curr);
+}
 
 
 int spf_algo_handler(param_t *param, ser_buff_t *tlv_buf,op_mode enable_or_disable){
@@ -508,6 +552,8 @@ int spf_algo_handler(param_t *param, ser_buff_t *tlv_buf,op_mode enable_or_disab
         case CMDCODE_RUN_SPF:
             compute_spf(node);
             break;
+        case CMDCODE_RUN_SPF_ALL:
+            compute_spf_all_routers(topo);
         default:
             break;
             

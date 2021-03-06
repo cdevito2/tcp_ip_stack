@@ -30,4 +30,6 @@
 #define ETH_IP  0x8000
 #define ICMP_PRO    1
 #define MAX_NXT_HOPS 4
+#define INTF_MAX_METRIC     16777215 /*Choosen as per the standard = 2^24 -1*/
+#define INTF_METRIC_DEFAULT 1
 #endif
