@@ -66,7 +66,6 @@ bool_t is_layer3_local_delivery(node_t *node, unsigned int dst_ip){
 }
 
 
-//TOTO : route lookup function , LPM lookup function
 
 
 
@@ -101,7 +100,19 @@ l3_route_t * rt_table_lookup(rt_table_t *rt_table, char *ip_addr, char mask){
 
 
 
+nexthop_t *l3_route_get_active_nextop(l3_route_t *l3_route){
+    if(l3_is_direct_route(l3_route)){
+        return NULL;
+    }
 
+    nexthop_t *nexthop = l3_route->nexthops[l3_route->nxthop_idx];
+    l3_route->nxthop_idx++;
+
+    if(l3_route->nxthop_idx == MAX_NXT_HOPS || !l3_route->nexthops[l3_route->nxthop_idx]){
+        l3_route->nxthop_idx = 0;
+    }
+    return nexthop;
+}
 
 
 
@@ -210,50 +221,70 @@ void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, ch
     
     unsigned int dst_int;
     char dest_str_with_mask[16];
+    bool_t new_route = FALSE;
     apply_mask(dst,mask,dest_str_with_mask);
     inet_pton(AF_INET,dest_str_with_mask,&dst_int);
 
     //dest route is the subnet ID which is why we apply mask
+    l3_route_t *l3_route = l3rib_lookup_lpm(rt_table,dst_int,mask);
 
-
-    l3_route_t *l3_route = l3rib_lookup_lpm(rt_table,dst_int);
-
+    if(!l3_route){
     //init mem
-    l3_route = calloc(1,sizeof(l3_route_t));
+        l3_route = calloc(1,sizeof(l3_route_t));
 
     //copy the subnet ID into the dest field of the route
-    strncpy(l3_route->dest,dest_str_with_mask,16);
+        strncpy(l3_route->dest,dest_str_with_mask,16);
     //esc char
-    l3_route->dest[15] = '\0';
+        l3_route->dest[15] = '\0';
 
     //set mask field for route
-    l3_route->mask = mask;
-
-    //set the is direct field
-    if(!gw && !oif){
+        l3_route->mask = mask;
+        new_route = TRUE;
         l3_route->is_direct = TRUE;
-    }
-    else{
-        l3_route->is_direct = FALSE;
+
+
     }
 
+    int i=0;
+    if(!new_route){
+        //get index into nexthop array - checking if route already exists
+        for(;i<MAX_NXT_HOPS;i++){
+            if(l3_route->nexthops[i]){
+                if(strncmp(l3_route->nexthops[i]->gw_ip,gw,16) == 0 &&
+                    l3_route->nexthops[i]->oif == oif){
+                    printf("Error : Attempt to add duplicate route\n");
+                    return;
+                }
+            }
+        }
+    }
+
+    if(i == MAX_NXT_HOPS){
+        printf("Error : no nexthops space left for route %s/%u\n",dst_str_with_mask,mask);
+        return;
+    }
 
     if(gw && oif){
+        nexthop_t *nexthop = calloc(1,sizeof(nexthop_t));
+        l3_route->nexthops[i]- = nexthop;
+        l3_route->is_direct = FALSE;
+        l3_route->spf_metric = spf_metric;
+        nexthop->refcount++;
         //copy gateway ip field into l3 route
-        strncpy(l3_route->gw_ip,gw,16);
+        strncpy(nexthop->gw_ip,gw,16);
         //esc char
-        l3_route->gw_ip[15] = '\0';
-
-        //copy the oif field into l3 route
-        strncpy(l3_route->oif,oif,IF_NAME_SIZE);
-        l3_route->oif[IF_NAME_SIZE -1] = '\0';
+        nexthop->gw_ip[15] = '\0';
+        nexthop->oif = oif;
     }
 
+    if(new_route){
     //add route into table
-    if(! _rt_table_entry_add(rt_table,l3_route)){
-        printf("Error : Route %s/%d Instantiation Failed \n",
-            dest_str_with_mask,mask);
-        free(l3_route);
+        if(! _rt_table_entry_add(rt_table,l3_route)){
+            printf("Error : Route %s/%d Instantiation Failed \n",
+                dest_str_with_mask,mask);
+            free(l3_route);
+        }
+
     }
 
 
@@ -281,15 +312,6 @@ static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int si
     //in vid he said to put as unsigned short?
     ip_hdr.total_length = (unsigned short)ip_hdr.ihl * 4 + (unsigned short)(size/4) + (unsigned short)((size %4) ? 1:0);
 
-
-
-    l3_route_t *l3_route = l3rib_lookup_lpm(NODE_RT_TABLE(node), ip_hdr.dst_ip);
-
-    if(!l3_route){
-        printf("Node : %s : No L3 Route\n",node->node_name);
-        return;
-    }
-
     //else we found a route, is it direct or not
     //first prepare a packet
     char *new_pkt = NULL;
@@ -304,33 +326,43 @@ static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int si
     }
 
 
+    l3_route_t *l3_route = l3rib_lookup_lpm(NODE_RT_TABLE(node), ip_hdr.dst_ip);
+
+    if(!l3_route){
+        printf("Node : %s : No L3 Route\n",node->node_name);
+        free(new_pkt);
+        return;
+    }
+
 
 
     //is direct route?
     bool_t is_direct_route = l3_is_direct_route(l3_route);
 
-    unsigned int next_hop_ip;
-
-    if(!is_direct_route){
-        //router forward to next hop
-        inet_pton(AF_INET,l3_route->gw_ip,&next_hop_ip);
-        next_hop_ip = htonl(next_hop_ip);
-    }
-    else{
-        //route is local subnet
-        //either trying to forward to host machine in subnet
-        //or self ping(interface on this router)
-        next_hop_ip = dest_ip_address;
-    }
-
     //create space so link layer can add ethernet hdr
     char *shifted_pkt_buffer = pkt_buffer_shift_right(new_pkt,new_pkt_size, MAX_PACKET_BUFFER_SIZE);
+    if(is_direct_route){
+        demote_pkt_to_layer2(node,dest_ip_address,0,shifted_pkt_buffer,new_pkt_size,ETH_IP);
+        return;
+    }
 
-    //send to link layer
-    demote_pkt_to_layer2(node,next_hop_ip, is_direct_route ?0:l3_route->oif,shifted_pkt_buffer,new_pkt_size,ETH_IP);
+    //not direct need to send out of nexthop
+    uint32_t next_hop_ip;
+    nexthop_t *nexthop = NULL;
+
+    nexthop = l3_route_get_active_nexthop(l3_route);
+
+    if(!nexthop){
+        free(new_pkt);
+        return;
+    }
+
+    inet_pton(AF_INET,nexthop->gw_ip,&next_hop_ip);
+    next_hop_ip = htonl(next_hop_ip);
+
+    demote_pkt_to_layer2(node,next_hop_ip,nexthop->oif->if_name,shifted_pkt_buffer,new_pkt_size,ETH_IP);
 
     free(new_pkt);
-
 }
 
 
@@ -411,11 +443,25 @@ static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface,
             return;
         }
 
-        unsigned int next_hop_ip;
-        inet_pton(AF_INET,l3_route->gw_ip,&next_hop_ip);
-        next_hop_ip = htonl(next_hop_ip);
 
-        demote_pkt_to_layer2(node,next_hop_ip,l3_route->oif,(char *)ip_hdr, pkt_size, ETH_IP);
+        /* If route is non direct, then ask LAyer 2 to send the pkt
+        * out of all ecmp nexthops of the route*/
+        uint32_t next_hop_ip;
+        nexthop_t *nexthop = NULL;
+
+        nexthop = l3_route_get_active_nexthop(l3_route);
+        assert(nexthop);
+    
+        inet_pton(AF_INET, nexthop->gw_ip, &next_hop_ip);
+        next_hop_ip = htonl(next_hop_ip);
+   
+
+        demote_pkt_to_layer2(node, 
+                next_hop_ip,
+                nexthop->oif->if_name,
+                (char *)ip_hdr, pkt_size,
+                ETH_IP); /*Network Layer need to tell Data link layer, 
+                       what type of payload it is passing down*/
     }
 
 }
@@ -440,10 +486,26 @@ void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt, unsi
 }
 
 
+static void l3_route_free(l3_route_t *l3_route){
+    spf_flush_nexthops(l3_route->nexthops);
+    free(l3_route);
+}
 
 
+void clear_rt_table(rt_table_t *rt_table){
+    glthread_t *curr;
+    l3_route_t *l3_route;
 
+    ITERATE_GLTHREAD_BEGIN(&rt_Table->route_list,curr){
+        l3_route = rt_glue_to_l3_route(curr);
+        if(l3_is_direct_route(l3_route)){
+            continue;
+        }
 
+        remove_glthread(curr);
+        l3_route_free(l3_route);
+    }ITERATE_GLTHREAD_END(&rt_table->route_list,curr);
+}
 
 
 void

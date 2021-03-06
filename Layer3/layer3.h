@@ -97,11 +97,14 @@ typedef struct l3_route_{
     char dest[16];
     char mask;
     bool_t is_direct;//true = no gateway or outgoing interface
-    char gw_ip[16];//next hop
-    char oif[IF_NAME_SIZE];
+    nexthop_t *nexthops[MAX_NXT_HOPS];
+    uint32_t spf_metric;
+    int nxthop_idx;
     glthread_t rt_glue;
 }l3_route_t;
 GLTHREAD_TO_STRUCT(rt_glue_to_l3_route,l3_route_t,rt_glue);
+
+nexthop_t *l3_route_get_active_nexthop(l3_route_t *l3_route);
 
 void init_rt_table(rt_table_t **rt_table);
 
