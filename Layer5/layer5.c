@@ -18,6 +18,10 @@
 
 
 #include "graph.h"
+#include <stdio.h>
+#include <stdint.h>
+#include "../tcpconst.h"
+#include "../gluethread/glthread.h"
 
 void
 promote_pkt_to_layer5(node_t *node, interface_t *recv_intf,

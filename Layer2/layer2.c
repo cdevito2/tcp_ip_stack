@@ -458,6 +458,17 @@ static void promote_pkt_to_layer2(node_t *node, interface_t *iif, ethernet_hdr_t
 }
 /*Interface config APIs for L2 mode configuration*/
 
+void interface_unset_l2_mode(node_t *node, interface_t *interface, char *l2_mode_option){
+//TODO
+}
+
+void
+interface_unset_vlan(node_t *node,
+                   interface_t *interface,
+                   uint32_t vlan){
+//TODO;
+}
+
 
 void
 interface_set_l2_mode(node_t *node, 

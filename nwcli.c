@@ -36,6 +36,7 @@
 #include "CommandParser/cmdtlv.h"
 #include "cmdcodes.h"
 #include "Layer5/app_handlers.h"
+#include <stdint.h>
 extern graph_t *topo;
 
 /* Display functions when user presses ?*/
@@ -90,6 +91,16 @@ validate_vlan_id(char *vlan_value){
 
     return VALIDATION_FAILED;
 }
+
+static int
+validate_interface_metric_val(char *value){
+
+    uint32_t metric_val = atoi(value);
+    if(metric_val > 0 && metric_val <= 16777215)
+        return VALIDATION_SUCCESS;
+    return VALIDATION_FAILED;
+}
+
 
 int
 validate_l2_mode_value(char *l2_mode_value){
@@ -451,7 +462,7 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
         else if(strncmp(tlv->leaf_id,"if-up-down",strlen("if-up-down"))==0)
             if_up_down = tlv->value;
         else if(strncmp(tlv->leaf_id,"metric-val",strlen("metric-val"))==0)
-            if_up_down = tlv->value;
+            intf_new_metric_val = atoi(tlv->value);
         else
             assert(0);
     } TLV_LOOP_END;
@@ -469,16 +480,13 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
         {
             uint32_t intf_existing_metric = get_link_cost(interface);
 
-            if(intf_existing_metric != intf_new_matric_val){
-                SET_BIT(if_change_flags, IF_METRIC_CHANGE_F); 
-            }
 
             switch(enable_or_disable){
                 case CONFIG_ENABLE:
-                    interface->link->cost = intf_new_matric_val;        
+                    interface->link->cost = intf_new_metric_val;        
                 break;
                 case CONFIG_DISABLE:
-                    interface->link->cost = INTF_METRIC_DEFAULT;
+                    interface->link->cost = 1;//TODO: put as INTF_METRIC_DEFAULT
                 break;
                 default: ;
             }

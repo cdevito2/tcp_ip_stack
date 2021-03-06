@@ -16,17 +16,17 @@
  * =====================================================================================
  */
 
+
 #include <stdio.h>
 #include "graph.h"
+#include "../Layer2/layer2.h"
 #include "layer3.h"
 #include <sys/socket.h>
 #include <memory.h>
-#include "tcpconst.h"
 #include <stdlib.h>
+#include "tcpconst.h"
 #include "comm.h"
-#include <arpa/inet.h>
-
-
+#include <arpa/inet.h> /*for inet_ntop & inet_pton*/
 
 static bool_t l3_is_direct_route(l3_route_t *l3_route){
     return (l3_route->is_direct);
@@ -100,7 +100,7 @@ l3_route_t * rt_table_lookup(rt_table_t *rt_table, char *ip_addr, char mask){
 
 
 
-nexthop_t *l3_route_get_active_nextop(l3_route_t *l3_route){
+nexthop_t *l3_route_get_active_nexthop(l3_route_t *l3_route){
     if(l3_is_direct_route(l3_route)){
         return NULL;
     }
@@ -146,18 +146,7 @@ static bool_t _rt_table_entry_add(rt_table_t *rt_table, l3_route_t *l3_route){
     //first check if route already exists
     l3_route_t *l3_route_old = rt_table_lookup(rt_table,l3_route->dest,l3_route->mask);
 
-    //if old route is equal to the new route return false and dont do anything
-    if(l3_route_old && IS_L3_ROUTES_EQUAL(l3_route_old, l3_route)){
-        return FALSE;
-    }
 
-    //delete old entry and add in new entry
-    if(l3_route_old){
-        delete_rt_table_entry(rt_table,l3_route_old->dest,l3_route_old->mask);
-
-    }
-
-    //or just add the new entry if it doesnt already exist
 
     init_glthread(&l3_route->rt_glue);
     glthread_add_next(&rt_table->route_list, &l3_route->rt_glue);
@@ -170,10 +159,36 @@ static bool_t _rt_table_entry_add(rt_table_t *rt_table, l3_route_t *l3_route){
 
 void rt_table_add_direct_route(rt_table_t *rt_table, char *dst, char mask){
     //no oif or gateway IP so call add route fcn with 0 passed for those
-    rt_table_add_route(rt_table,dst,mask,0,0);
+    rt_table_add_route(rt_table,dst,mask,0,0,0);
 }
 
 
+l3_route_t *
+l3rib_lookup(rt_table_t *rt_table, 
+             uint32_t dest_ip, 
+             char mask){
+
+    char dest_ip_str[16];
+    glthread_t *curr = NULL;
+    char dst_str_with_mask[16];
+    l3_route_t *l3_route = NULL;
+
+    tcp_ip_convert_ip_n_to_p(dest_ip, dest_ip_str);
+
+    apply_mask(dest_ip_str, mask, dst_str_with_mask);
+
+    ITERATE_GLTHREAD_BEGIN(&rt_table->route_list, curr){
+
+        l3_route = rt_glue_to_l3_route(curr);
+        
+        if(strncmp(dst_str_with_mask, l3_route->dest, 16) == 0 &&
+            l3_route->mask == mask){
+            return l3_route;
+        }
+    } ITERATE_GLTHREAD_END(&rt_table->route_list, curr);
+
+    return NULL;
+}
 
 
 
@@ -226,7 +241,7 @@ void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, ch
     inet_pton(AF_INET,dest_str_with_mask,&dst_int);
 
     //dest route is the subnet ID which is why we apply mask
-    l3_route_t *l3_route = l3rib_lookup_lpm(rt_table,dst_int,mask);
+    l3_route_t *l3_route = l3rib_lookup(rt_table,dst_int,mask);
 
     if(!l3_route){
     //init mem
@@ -260,16 +275,16 @@ void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, ch
     }
 
     if(i == MAX_NXT_HOPS){
-        printf("Error : no nexthops space left for route %s/%u\n",dst_str_with_mask,mask);
+        printf("Error : no nexthops space left for route %s/%u\n",dest_str_with_mask,mask);
         return;
     }
 
     if(gw && oif){
         nexthop_t *nexthop = calloc(1,sizeof(nexthop_t));
-        l3_route->nexthops[i]- = nexthop;
+        l3_route->nexthops[i] = nexthop;
         l3_route->is_direct = FALSE;
         l3_route->spf_metric = spf_metric;
-        nexthop->refcount++;
+        nexthop->ref_count++;
         //copy gateway ip field into l3 route
         strncpy(nexthop->gw_ip,gw,16);
         //esc char
@@ -496,7 +511,7 @@ void clear_rt_table(rt_table_t *rt_table){
     glthread_t *curr;
     l3_route_t *l3_route;
 
-    ITERATE_GLTHREAD_BEGIN(&rt_Table->route_list,curr){
+    ITERATE_GLTHREAD_BEGIN(&rt_table->route_list,curr){
         l3_route = rt_glue_to_l3_route(curr);
         if(l3_is_direct_route(l3_route)){
             continue;
@@ -508,24 +523,54 @@ void clear_rt_table(rt_table_t *rt_table){
 }
 
 
+
+
 void
 dump_rt_table(rt_table_t *rt_table){
 
+    int i = 0;
     glthread_t *curr = NULL;
     l3_route_t *l3_route = NULL;
-
+    int count = 0;
     printf("L3 Routing Table:\n");
     ITERATE_GLTHREAD_BEGIN(&rt_table->route_list, curr){
 
         l3_route = rt_glue_to_l3_route(curr);
-        printf("\t%-18s %-4d %-18s %s\n", 
-                l3_route->dest, l3_route->mask,
-                l3_route->is_direct ? "NA" : l3_route->gw_ip, 
-                l3_route->is_direct ? "NA" : l3_route->oif);
+        count++;
+        if(l3_route->is_direct){
+            if(count != 1){
+                printf("\t|===================|=======|====================|==============|==========|\n");
+            }
+            else{
+                printf("\t|======= IP ========|== M ==|======== Gw ========|===== Oif ====|== Cost ==|\n");
+            }
+            printf("\t|%-18s |  %-4d | %-18s | %-12s |          |\n", 
+                    l3_route->dest, l3_route->mask, "NA", "NA");
+            continue;
+        }
 
+        for( i = 0; i < MAX_NXT_HOPS; i++){
+            if(l3_route->nexthops[i]){
+                if(i == 0){
+                    if(count != 1){
+                        printf("\t|===================|=======|====================|==============|==========|\n");
+                    }
+                    else{
+                        printf("\t|======= IP ========|== M ==|======== Gw ========|===== Oif ====|== Cost ==|\n");
+                    }
+                    printf("\t|%-18s |  %-4d | %-18s | %-12s |  %-4u    |\n", 
+                            l3_route->dest, l3_route->mask,
+                            l3_route->nexthops[i]->gw_ip, 
+                            l3_route->nexthops[i]->oif->if_name, l3_route->spf_metric);
+                }
+                else{
+                    printf("\t|                   |       | %-18s | %-12s |          |\n", 
+                            l3_route->nexthops[i]->gw_ip, 
+                            l3_route->nexthops[i]->oif->if_name);
+                }
+            }
+        }
     } ITERATE_GLTHREAD_END(&rt_table->route_list, curr); 
+    printf("\t|===================|=======|====================|==============|==========|\n");
 }
-
-
-
 

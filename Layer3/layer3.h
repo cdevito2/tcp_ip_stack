@@ -93,6 +93,9 @@ typedef struct nexthop_{
 }nexthop_t;
 
 
+#define nexthop_node_name(nexthop_ptr)  \
+   ((get_nbr_node(nexthop_ptr->oif))->node_name)
+
 typedef struct l3_route_{
     char dest[16];
     char mask;
@@ -109,7 +112,7 @@ nexthop_t *l3_route_get_active_nexthop(l3_route_t *l3_route);
 void init_rt_table(rt_table_t **rt_table);
 
 
-void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif);
+void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif,uint32_t spf_metric);
 
 void rt_table_add_direct_route(rt_table_t *rt_table, char *dst, char mask);
 
@@ -125,6 +128,8 @@ void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int pro
 
 
 
+l3_route_t *
+l3rib_lookup(rt_table_t *rt_table, uint32_t dest_ip, char mask);
 
 l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table, unsigned int dest_ip);
 
