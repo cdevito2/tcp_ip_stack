@@ -15,18 +15,26 @@ Step 3 : run executible
 The project brings up a CLI in which you can interact with 
 
 Important Commands to know:
-
+<br>
 -- show topo : shows the all the nodes in the topology and their interface information
+<br>
 -- show node <node-name> arp : shows the ARP table for the specific node
+  <br>
 -- show node <node-name> rt : shows the Routing table for the specific node
+  <br>
 -- show node <node-name> mac : shows the MAC table for the specific node
+  <br>
 -- run node <node-name> ping <ip> : tries to ping the selected ip address. Will use ARP(more explanation below).
+  <br>
 -- run node <node-name> resolve-arp <ip-address> : this project has ARP on demand so this cmd is not necesary, but you can still resolve arp manually if you want
   
 Features:
 -- pkt_gen.exe - will inject packets into a specified note + interface to simulate real traffic in a TCP/IP stack. see pkt_gen.c for details.
+<br>
 -- ON demand ARP - The topology will resolve ARP on demand if you try to ping an IP address, where the current node does not know the destination MAC address. 
+<br>
 -- Dynamic Construction of Routing table - This project runs SPF algorithm on start to determine least cost paths to all node loopback addresses.
+<br>
 -- VLAN based MAC learning/forwarding - There are topologies in topologies.c that consist of multiple switches and VLAN definitions for Switch Ports. Should still be able to      ping interfaces in different VLAns. 
 
 
