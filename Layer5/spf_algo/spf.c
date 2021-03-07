@@ -22,6 +22,8 @@
 
 
 #define INFINITE_METRIC 0xFFFFFFFF
+#define SPF_LOGGING 1
+
 
 extern graph_t *topo;
 
@@ -77,6 +79,7 @@ static inline void free_spf_result(spf_result_t *spf_result){
 
 
 static void init_node_spf_data(node_t *node, bool_t delete_spf_result){
+
     if(!node->spf_data){
         node->spf_data = calloc(1,sizeof(spf_data_t));
         init_glthread(&node->spf_data->spf_result_head);
@@ -199,6 +202,23 @@ static spf_result_t *spf_lookup_spf_result_by_node(node_t *spf_root, node_t *nod
 
 }
 
+static char *
+nexthops_str(nexthop_t **nexthops){
+
+    static char buffer[256];
+    memset(buffer, 0 , 256);
+
+    int i = 0;
+
+    for( ; i < MAX_NXT_HOPS; i++){
+
+        if(!nexthops[i]) continue;
+        snprintf(buffer, 256, "%s ", nexthop_node_name(nexthops[i]));
+    }
+    return buffer;
+}
+
+
 static void spf_record_result(node_t *spf_root, node_t *processed_node){
     //processed node is the node dequeued
     //shortest path has been calculated for that node
@@ -237,7 +257,9 @@ void initialize_direct_nbrs(node_t *spf_root){
     ITERATE_NODE_NBRS_BEGIN(spf_root,nbr,oif,nxt_hop_ip){
         //check if nexthop is eligible(aka bidirectional)
         //if No, go to next nexthop in the list
-        if(!is_interface_l3_bidirectional(oif))continue;
+        if(!is_interface_l3_bidirectional(oif)){
+            continue;
+        }
         //if YESS, check if the cost is less then current
         if(get_link_cost(oif) < SPF_METRIC(nbr)){
             //add the new least cost path
@@ -279,13 +301,6 @@ static void spf_explore_nbrs(node_t *spf_root, node_t *curr_node, glthread_t *pr
         
         if(!is_interface_l3_bidirectional(oif)) continue;
 
-        #if SPF_LOGGING
-        printf("root : %s : Event : Testing Inequality : " 
-                " spf_metric(%s, %u) + link cost(%u) < spf_metric(%s, %u)\n",
-                spf_root->node_name, curr_node->node_name, 
-                curr_node->curr_spf_data->spf_metric, 
-                get_link_cost(oif), nbr->node_name, nbr->spf_data->spf_metric);
-        #endif
     
         if(SPF_METRIC(curr_node) + get_link_cost(oif) < SPF_METRIC(nbr)){
             //we have found a nbr node reachable by a better cost
@@ -380,13 +395,17 @@ static int spf_install_routes(node_t *spf_root){
 
 
 static void compute_spf(node_t *spf_root){
-
     //INIT - PART 1
     node_t *node,*nbr;
     interface_t *oif;
     char *nxt_hop_ip = NULL;
     spf_data_t *curr_spf_data;
     glthread_t *curr;
+    
+    #if SPF_LOGGING
+    printf("root : %s : Event : Running Spf\n", spf_root->node_name);
+    #endif
+    
     init_node_spf_data(spf_root,TRUE);
     SPF_METRIC(spf_root) = 0;
     //init metrics
@@ -408,7 +427,9 @@ static void compute_spf(node_t *spf_root){
     //PART 3 - initialize PQ and add SPF root
     
     glthread_t priority_list;
+    
     init_glthread(&priority_list);
+    
     glthread_priority_insert(&priority_list,
         &spf_root->spf_data->priority_thread_glue,
         spf_comparison_fn,
@@ -424,11 +445,15 @@ static void compute_spf(node_t *spf_root){
         //check if its the root
         curr_spf_data = priority_thread_glue_to_spf_data(curr);
 
+        #if SPF_LOGGING
+        printf("root : %s : Event : Node %s taken out of priority queue\n",
+                spf_root->node_name, curr_spf_data->node->node_name);
+        #endif
+
         if(curr_spf_data->node == spf_root){
             //for every eligible nbor not in PQ push to PQ
             ITERATE_NODE_NBRS_BEGIN(curr_spf_data->node,nbr,oif,nxt_hop_ip){
                 if(!is_interface_l3_bidirectional(oif))continue;
-
                 if(IS_GLTHREAD_LIST_EMPTY(&nbr->spf_data->priority_thread_glue)){
                     #if SPF_LOGGING
                     printf("root : %s : Event : Processing Direct Nbr %s\n", 
@@ -517,6 +542,7 @@ static void show_spf_results(node_t *node){
 
 
 
+
 static void compute_spf_all_routers(graph_t *topo){
     glthread_t *curr;
     ITERATE_GLTHREAD_BEGIN(&topo->node_list,curr){
@@ -525,6 +551,10 @@ static void compute_spf_all_routers(graph_t *topo){
     }ITERATE_GLTHREAD_END(&topo->node_list,curr);
 }
 
+void init_spf_algo()
+{
+    compute_spf_all_routers(topo);
+}
 
 int spf_algo_handler(param_t *param, ser_buff_t *tlv_buf,op_mode enable_or_disable){
     int CMDCODE;

@@ -76,7 +76,7 @@ static inline void initialize_ip_hdr(ip_hdr_t *ip_hdr){
 #define IP_HDR_LEN_BYTES(ip_hdr_ptr)    (ip_hdr_ptr->ihl * 4)
 #define IP_HDR_TOTAL_LEN_IN_BYTES(ip_hdr_ptr)   (ip_hdr_ptr->total_length * 4)
 #define INCREMENT_IPHDR(ip_hdr_ptr)     ((char *)ip_hdr_ptr + (ip_hdr_ptr->ihl *4))
-#define IP_HDR_PAYLOAD_SIZE(ip_hdr_ptr) (IP_HDR_TOTAL_LEN_IN_BYTES(pi_hdr_ptr) - \
+#define IP_HDR_PAYLOAD_SIZE(ip_hdr_ptr) (IP_HDR_TOTAL_LEN_IN_BYTES(ip_hdr_ptr) - \
         IP_HDR_LEN_BYTES(ip_hdr_ptr))   
 
 
@@ -112,7 +112,7 @@ nexthop_t *l3_route_get_active_nexthop(l3_route_t *l3_route);
 void init_rt_table(rt_table_t **rt_table);
 
 
-void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif,uint32_t spf_metric);
+void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, interface_t *oif,uint32_t spf_metric);
 
 void rt_table_add_direct_route(rt_table_t *rt_table, char *dst, char mask);
 
@@ -124,8 +124,11 @@ void promote_pkt_to_layer3(node_t *node, interface_t *interface, char *pkt, unsi
 
 void demote_packet_to_layer3(node_t *node, char *pkt, unsigned int size, int protocol_number, unsigned int dest_ip_address);
 
+void
+clear_rt_table(rt_table_t *rt_table);
 
-
+l3_route_t *
+rt_table_lookup(rt_table_t *rt_table, char *ip_addr, char mask);
 
 
 l3_route_t *

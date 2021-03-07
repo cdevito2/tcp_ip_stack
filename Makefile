@@ -15,6 +15,7 @@ OBJS=gluethread/glthread.o \
 		  utils.o		   \
 		  Layer2/l2switch.o \
 		  Layer5/spf_algo/spf.o \
+		  tcp_stack_init.o
 
 pkt_gen.exe:pkt_gen.o utils.o
 	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
@@ -66,6 +67,9 @@ nwcli.o:nwcli.c
 
 utils.o:utils.c
 	${CC} ${CFLAGS} -c -I . utils.c -o utils.o
+
+tcp_stack_init.o:tcp_stack_init.c
+	${CC} ${CFLAGS} -c tcp_stack_init.c -o tcp_stack_init.o
 
 
 CommandParser/libcli.a:

@@ -49,13 +49,15 @@ bool_t is_layer3_local_delivery(node_t *node, unsigned int dst_ip){
 
 
     //else loop and check node interfaces
-    unsigned int i=0;
+    uint32_t i=0;
     interface_t *intf;
     for (;i<MAX_INTF_PER_NODE;i++){
         intf=node->intf[i];
         if(!intf){
             return FALSE;
         }
+        if(intf->intf_nw_props.is_ipadd_config == FALSE)
+            continue;
 
         intf_addr = IF_IP(intf);
         if(strncmp(intf_addr,dest_ip_str,16)==0){
@@ -230,7 +232,7 @@ l3_route_t *l3rib_lookup_lpm(rt_table_t *rt_table,unsigned int dest_ip){
 
 
 
-void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, char *oif,uint32_t spf_metric){
+void rt_table_add_route(rt_table_t *rt_table, char *dst, char mask, char *gw, interface_t *oif,uint32_t spf_metric){
     
     
     
