@@ -12,3 +12,10 @@ Frame ingress journey in my tcp stack:
 4. If false, discard packet, if true, send to processing/hand over to the stack
 4a. if pkt arrived on L3 interface, process pkt by type value( if 806, its an arp msg so layer 2 process. If type is 0x8000 promote to layer3
 4b. If pkt arrives on L2 interface, call l2_switch_recv_frame, which feeds to l2 switch forwarding algorithm.
+
+
+TODO:
+-- IP in IP encapsulation
+-- Logging infrstructure
+-- Notification Chains
+-- Integrating wheel timers
