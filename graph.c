@@ -47,7 +47,14 @@ node_t * create_graph_node(graph_t *graph, char *node_name){
     init_udp_socket(node);
     //initialize node networking info
 
+    //TODO: check if this causes program crash
+    node->spf_data = NULL;
     init_node_nw_prop(&node->node_nw_prop);
+
+
+    //LOGGING INIT
+    tcp_ip_init_node_log_info(node);
+
     init_glthread(&node->graph_glue); 
     //add the glthread node to the linked list
     glthread_add_next(&graph->node_list,&node->graph_glue);
@@ -92,6 +99,10 @@ insert_link_between_two_nodes(node_t *node1,
     /*Now Assign Random generated Mac address to the Interfaces*/
     interface_assign_mac_address(&link->intf1);
     interface_assign_mac_address(&link->intf2);
+
+    //init interface logging
+    tcp_ip_init_intf_log_info(&link->intf1);
+    tcp_ip_init_intf_log_info(&link->intf2);
 }
 
 void dump_graph(graph_t *graph){

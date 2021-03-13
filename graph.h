@@ -23,6 +23,10 @@
 #include "net.h"
 #include <assert.h>
 #include <stddef.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdint.h>
+#include "tcp_ip_trace.h"
      
 #define NODE_NAME_SIZE 16
 #define IF_NAME_SIZE 16
@@ -53,6 +57,7 @@ typedef struct interface_{
     struct link_ *link; //pointer to the link for the interface
 
     intf_nw_props_t intf_nw_props;//struct to hold networking properties for interface
+    log_t log_info;
 } interface_t;
 
 typedef struct link_{
@@ -76,6 +81,9 @@ struct node_{
     unsigned int udp_port_number;
     int udp_sock_fd;
     spf_data_t *spf_data;
+
+    //node logging
+    log_t log_info;
 };
 
 

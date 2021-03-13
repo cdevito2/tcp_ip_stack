@@ -20,6 +20,15 @@
 
 #include "utils.h"
 #include <memory.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <assert.h>
+#include <pthread.h>
+#include "comm.h"
+#include "tcpconst.h"
+#include "tcp_ip_trace.h"
 
 #define MAX_VLAN_MEMBERSHIP 10
 
@@ -73,6 +82,8 @@ typedef struct node_nw_prop_{
     bool_t is_lb_addr_config;//bool to see if loopback configured
     
     ip_add_t lb_addr; //loopback address
+    char *send_log_buffer;//logging
+
 }node_nw_prop_t;
 
 
@@ -89,6 +100,8 @@ static inline void init_node_nw_prop(node_nw_prop_t *node_nw_prop){
     init_arp_table(&(node_nw_prop->arp_table));
     init_mac_table(&(node_nw_prop->mac_table));
     init_rt_table(&(node_nw_prop->rt_table));
+
+    node_nw_prop->send_log_buffer = calloc(1,TCP_PRINT_BUFFER_SIZE);
 }
 
 

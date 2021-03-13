@@ -15,7 +15,8 @@ OBJS=gluethread/glthread.o \
 		  utils.o		   \
 		  Layer2/l2switch.o \
 		  Layer5/spf_algo/spf.o \
-		  tcp_stack_init.o
+		  tcp_stack_init.o \
+		  tcp_ip_trace.o
 
 pkt_gen.exe:pkt_gen.o utils.o
 	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
@@ -71,6 +72,8 @@ utils.o:utils.c
 tcp_stack_init.o:tcp_stack_init.c
 	${CC} ${CFLAGS} -c tcp_stack_init.c -o tcp_stack_init.o
 
+tcp_ip_trace.o:tcp_ip_trace.c
+	${CC} ${CFLAGS} -c -I . tcp_ip_trace.c -o tcp_ip_trace.o
 
 CommandParser/libcli.a:
 	(cd CommandParser; make)

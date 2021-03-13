@@ -127,9 +127,11 @@ int pkt_receive(node_t *node, interface_t *interface, char *pkt, unsigned int pk
     //entry point into link layer
     //ingress journey of packet starts from here in the TCP IP stack
     //here we perform a right shift to the packet pointer to the right boundary, right before the pkt data, note previously it was pointing to the beginning of data but we need to add space before it
-    ethernet_hdr_t *eth = (ethernet_hdr_t *)pkt;
+    
+    //WRITE TO LOGGER
+    tcp_dump_recv_logger(node,interface,(char *)pkt,pkt_size, ETH_HDR);
+    
     pkt = pkt_buffer_shift_right(pkt,pkt_size, MAX_PACKET_BUFFER_SIZE - IF_NAME_SIZE);
-    ethernet_hdr_t *ethernet_hdr = (ethernet_hdr_t *)pkt;
     //further processing of packet
     ///*  THIS FUNCTION IS THE ENTRY POINT INTO THE TCP IP STACK FROM THE BOTTOM! */
     //note that packet pointer at this point is pointing to the data in the already right shifted packet buffer 
@@ -186,6 +188,9 @@ send_pkt_out(char *pkt, unsigned int pkt_size,
 
     if (rc > 0){
         interface->intf_nw_props.pkt_sent++;
+        //WRITE TO LOGGER
+        tcp_dump_send_logger(sending_node, interface, 
+        pkt_with_aux_data +IF_NAME_SIZE, pkt_size, ETH_HDR);
     }
     close(sock);
     return rc; 

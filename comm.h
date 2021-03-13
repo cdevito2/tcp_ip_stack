@@ -19,6 +19,7 @@
 #ifndef __COMM__
 #define __COMM__
 
+#include <stdint.h>
 
 #define MAX_PACKET_BUFFER_SIZE  2048
 
