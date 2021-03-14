@@ -22,6 +22,8 @@
 #include <errno.h>
 #include "tcp_public.h"
 
+extern graph_t *topo;
+
 static char tcp_print_recv_buffer[TCP_PRINT_BUFFER_SIZE];
 static char string_buffer[35];
 
@@ -369,6 +371,237 @@ void tcp_ip_init_intf_log_info(interface_t *interface){
     log_info->log_file  = initialize_interface_log_file(interface);
 
 }
+
+void tcp_ip_show_log_status(node_t *node){
+    int i=0;
+    interface_t *intf;
+    log_t *log_info = &node->log_info;
+
+    printf("Log Status : Device : %s\n",node->node_name);
+    printf("\tall     : %s\n", log_info->all ? "ON" : "OFF");
+    printf("\trecv    : %s\n", log_info->recv ? "ON" : "OFF");
+    printf("\tsend    : %s\n", log_info->send ? "ON" : "OFF");
+    printf("\tstdout  : %s\n", log_info->is_stdout ? "ON" : "OFF");
+    printf("\tl3_fwd  : %s\n", log_info->l3_fwd ? "ON" : "OFF");
+
+    for( ; i < MAX_INTF_PER_NODE; i++){
+        intf = node->intf[i];
+        if(!intf) continue;
+
+        log_info = &intf->log_info;
+        printf("\tLog Status : %s(%s)\n", intf->if_name, IF_IS_UP(intf) ? "UP" : "DOWN");
+        printf("\t\tall     : %s\n", log_info->all ? "ON" : "OFF");
+        printf("\t\trecv    : %s\n", log_info->recv ? "ON" : "OFF");
+        printf("\t\tsend    : %s\n", log_info->send ? "ON" : "OFF");
+        printf("\t\tstdout  : %s\n", log_info->is_stdout ? "ON" : "OFF");
+    }
+
+}
+
+
+void tcp_ip_set_all_log_info_params(log_t *log_info, bool_t status){
+
+    log_info->all    = status;
+    log_info->recv   = status;
+    log_info->send   = status;
+    log_info->l3_fwd = status;
+}
+
+
+int traceoptions_handler(param_t *param, ser_buff_t *tlv_buf, op_mode enable_or_disable){
+    node_t *node;
+    char *node_name;
+    char *if_name;
+    uint32_t flags;
+    interface_t *intf;
+    int cmdcode = -1;
+
+    char *flag_val;
+    log_t *log_info;
+
+    tlv_struct_t *tlv = NULL;
+    int CMDCODE = EXTRACT_CMD_CODE(tlv_buf);
+
+    TLV_LOOP_BEGIN(tlv_buf, tlv){
+        if(strncmp(tlv->leaf_id,"node-name",strlen("node-name")) == 0){
+            node_name = tlv->value;
+        }
+        else if(strncmp(tlv->leaf_id,"of-name",strlen("if-name")) == 0){
+            if_name = tlv->value;
+        }
+        else if(strncmp(tlv->leaf_id,"node-name",strlen("node-name")) == 0){
+            flag_val = tlv->value;
+        }
+        else{
+            assert(0);//crash program
+        }
+    }TLV_LOOP_END;
+
+    //check which command was inputted 
+    switch(CMDCODE){
+        case CMDCODE_DEBUG_GLOBAL_STDOUT:
+            topo->gstdout = TRUE;
+            break;
+        case CMDCODE_DEBUG_LOGGING_PER_NODE:
+        case CMDCODE_DEBUG_SHOW_LOG_STATUS:
+            node = get_node_by_node_name(topo,node_name);
+            log_info = &node->log_info;
+        break;
+        case CMDCODE_DEBUG_LOGGING_PER_INTF:
+            node = get_node_by_node_name(topo,node_name);
+            intf = get_node_if_by_name(node,if_name);
+            if(!intf){
+                printf("Error no interface found for %s on node &s\n",if_name,node_name);
+                return -1;
+            }
+            log_info = &intf->log_info;
+        break;
+        default:
+            ;
+    }
+    if(CMDCODE == CMDCODE_DEBUG_LOGGING_PER_NODE ||
+           CMDCODE == CMDCODE_DEBUG_LOGGING_PER_INTF){
+
+        if(strcmp(flag_val,"all") ==0){
+            tcp_ip_set_all_log_info_params(log_info,TRUE);
+
+        }
+        else if(strcmp(flag_val,"no_all") ==0){
+            tcp_ip_set_all_log_info_params(log_info,FALSE);
+            if(CMDCODE == CMDCODE_DEBUG_LOGGING_PER_NODE){
+                //disable interface logging
+                int i=0;
+                interface_t *intf;
+                for(;i<MAX_INTF_PER_NODE;i++){
+                    intf = node->intf[i];
+                    if(!intf){
+                        continue;
+                    }
+                    tcp_ip_set_all_log_info_params(&intf->log_info,FALSE);
+                }
+            }
+        }
+        //check the other flags
+        else if(strcmp(flag_val, "recv") == 0){
+            log_info->recv = TRUE;
+        }
+        else if(strcmp(flag_val, "no-recv") == 0){
+            log_info->recv = FALSE;
+        }
+        else if(strcmp(flag_val, "send") == 0){
+            log_info->send = TRUE;
+        }
+        else if(strcmp(flag_val, "no-send") == 0){
+            log_info->send = FALSE;
+        }
+        else if(strcmp(flag_val, "stdout") == 0){
+            log_info->is_stdout = TRUE;
+        }
+        else if(strcmp(flag_val, "no-stdout") == 0){
+            log_info->is_stdout = FALSE;
+        }
+        else if(strcmp(flag_val, "l3-fwd") == 0){
+            log_info->l3_fwd = TRUE;
+        }
+        else if(strcmp(flag_val, "no-l3-fwd") == 0){
+            log_info->l3_fwd = FALSE;
+        }
+    }
+    else if(CMDCODE == CMDCODE_DEBUG_SHOW_LOG_STATUS){
+        tcp_ip_show_log_status(node);
+    }
+    return 0;
+
+}
+
+static void display_expected_flag(param_t *param, ser_buff_t *tlv_buff){
+    printf(" : all | no-all\n");
+    printf(" : recv | no-recv\n");
+    printf(" : send | no-send\n");
+    printf(" : stdout | no-stdout\n");
+    printf(" : l3-fwd | no-l3-fwd\n");
+
+}
+
+
+int validate_flag_values(char *value){
+    int k = 0;
+    int len = strlen(value);
+
+    if( (strncmp(value, "all",      k = strlen("all"))       ==   0   && k  == len)          || 
+        (strncmp(value, "no-all",   k = strlen("no-all"))    ==   0   && k  == len)          ||
+        (strncmp(value, "recv",     k = strlen("recv"))      ==   0   && k  == len)          ||
+        (strncmp(value, "no-recv",  k = strlen("no-recv"))   ==   0   && k  == len)          ||
+        (strncmp(value, "send",     k = strlen("send"))      ==   0   && k  == len)          ||
+        (strncmp(value, "no-send",  k = strlen("no-send"))   ==   0   && k  == len)          ||
+        (strncmp(value, "stdout",   k = strlen("stdout"))    ==   0   && k  == len)          ||
+        (strncmp(value, "no-stdout",k = strlen("no-stdout")) ==   0   && k  == len)          ||
+        (strncmp(value, "l3-fwd",   k = strlen("l3-fwd"))    ==   0   && k  == len)          ||
+        (strncmp(value, "no-l3-fwd",k = strlen("no-l3-fwd")) ==   0   && k  == len)){
+        return VALIDATION_SUCCESS;
+    }
+    return VALIDATION_FAILED;
+
+}
+
+
+static void tcp_ip_build_node_traceoptions_cli(param_t *node_name_param){
+    {
+        static param_t traceoptions;
+        init_param(&traceoptions, CMD, "traceoptions", 0, 0, INVALID, 0, "traceoptions");
+        libcli_register_param(node_name_param, &traceoptions);
+        {
+            static param_t flag;
+            init_param(&flag, CMD, "flag", 0, 0, INVALID, 0, "flag");
+            libcli_register_param(&traceoptions, &flag);
+            libcli_register_display_callback(&flag, display_expected_flag);
+            {
+                static param_t flag_val;
+                init_param(&flag_val, LEAF, 0, traceoptions_handler, validate_flag_values, STRING, "flag-val", 
+                        "<all | no-all | recv | no-recv | send | no-send | stdout | no-stdout | l3-fwd | no-l3-fwd>");
+                libcli_register_param(&flag, &flag_val);
+                set_param_cmd_code(&flag_val, CMDCODE_DEBUG_LOGGING_PER_NODE);
+            }
+        }
+    }
+}
+
+
+
+static void tcp_ip_build_intf_traceoptions_cli(param_t *intf_name_param){
+    {
+        static param_t traceoptions;
+        init_param(&traceoptions, CMD, "traceoptions", 0, 0, INVALID, 0, "traceoptions");
+        libcli_register_param(intf_name_param, &traceoptions);
+        {
+            static param_t flag;
+            init_param(&flag, CMD, "flag", 0, 0, INVALID, 0, "flag");
+            libcli_register_param(&traceoptions, &flag);
+            libcli_register_display_callback(&flag, display_expected_flag);
+            {
+                static param_t flag_val;
+                init_param(&flag_val, LEAF, 0, traceoptions_handler, validate_flag_values, STRING, "flag-val", 
+                    "<all | no-all | recv | no-recv | send | no-send | stdout | no-stdout>");
+                libcli_register_param(&flag, &flag_val);
+                set_param_cmd_code(&flag_val, CMDCODE_DEBUG_LOGGING_PER_INTF);
+            }
+        }
+    }
+
+}
+
+
+extern void tcp_ip_traceoptions_cli(param_t *node_name_param,param_t *intf_name_param){
+    if(node_name_param){
+        tcp_ip_build_node_traceoptions_cli(node_name_param);
+    }
+    if(intf_name_param){
+        tcp_ip_build_intf_traceoptions_cli(intf_name_param);
+    }
+}
+
+
+
 
 
 

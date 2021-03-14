@@ -37,6 +37,11 @@
 #define CMDCODE_RUN_SPF             18  /*run node <node-name> spf*/
 #define CMDCODE_SHOW_SPF_RESULTS    19  /*show node <node-name> spf-results*/
 #define CMDCODE_RUN_SPF_ALL         20  /* run spf all */
+//Logging and Debugging
+#define CMDCODE_DEBUG_LOGGING_PER_NODE   21  /*config node <node-name> traceoptions flag <all | no-all | recv | no-recv | send | no-send | stdout | no-stdout>*/
+#define CMDCODE_DEBUG_LOGGING_PER_INTF   22  /*config node <node-name> interface <intf-name> traceoptions flag <all | no-all | recv | no-recv | send | no-send | stdout | no-stdout>*/
+#define CMDCODE_DEBUG_SHOW_LOG_STATUS    23  /*show node <node-name> log-status*/
+#define CMDCODE_DEBUG_GLOBAL_STDOUT      24  /*config global stdout*/
 #define CMDCODE_CONF_INTF_UP_DOWN        26 /*config node <node-name> interface <if-name> <up|down>*/
 #define CMDCODE_INTF_CONFIG_METRIC       33 /*config node <node-name> interface <if-name> metric <metric-val>*/
 #endif

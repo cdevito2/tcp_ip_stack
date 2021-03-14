@@ -48,7 +48,7 @@ typedef struct link_ link_t;
 typedef struct graph_ { 
     char topology_name[32]; //store name of topology
     glthread_t node_list; //modified form of linked list of nodes
-
+    bool_t gstdout;
 }graph_t;
 
 typedef struct interface_{

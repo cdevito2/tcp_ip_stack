@@ -39,6 +39,11 @@
 #include <stdint.h>
 extern graph_t *topo;
 
+extern void tcp_ip_traceoptions_cli(param_t *node_name_param, param_t *intf_name_param);
+
+extern int traceoptions_handler(param_t *param, ser_buff_t *tlv_buff, op_mode enable_or_disable);
+
+
 /* Display functions when user presses ?*/
 void
 display_graph_nodes(param_t *param, ser_buff_t *tlv_buf){
@@ -561,6 +566,10 @@ nw_init_cli(){
                  init_param(&node_name, LEAF, 0, 0, validate_node_extistence, STRING, "node-name", "Node Name");
                  libcli_register_param(&node, &node_name);
                  {
+                     static param_t log_status;
+                     init_param(&log_status,CMD,"log-status",traceoptions_handler,0,INVALID,0,"log-status");
+                 }
+                 {
                     /*show node <node-name> arp*/
                     static param_t arp;
                     init_param(&arp, CMD, "arp", show_arp_handler, 0, INVALID, 0, "Dump Arp Table");
@@ -679,7 +688,20 @@ nw_init_cli(){
             }
         }
     }
+    {
+        /*config global */
+        static param_t global;
+        init_param(&global,CMD,"global",0,0,INVALID,0,"global network-wide config");
+        libcli_register_param(config,&global);
+        {
+            /* config global stdout */
+            static param_t _stdout;
+            init_param(&_stdout,CMD,"stdout",traceoptions_handler,0,INVALID,0,"Turn on stdio logging");
+            libcli_register_param(&global,&_stdout);
+            set_param_cmd_code(&_stdout,CMDCODE_DEBUG_GLOBAL_STDOUT);
+        }
 
+    }
     /*config node*/
     {
       static param_t node;
@@ -692,6 +714,7 @@ nw_init_cli(){
         init_param(&node_name, LEAF, 0, 0, validate_node_extistence, STRING, "node-name", "Node Name");
         libcli_register_param(&node, &node_name);
         {
+            tcp_ip_traceoptions_cli(&node_name,0);
             /*config node <node-name> interface*/
             static param_t interface;
             init_param(&interface, CMD, "interface", 0, 0, INVALID, 0, "\"interface\" keyword");    
@@ -702,6 +725,7 @@ nw_init_cli(){
                 init_param(&if_name, LEAF, 0, 0, 0, STRING, "if-name", "Interface Name");
                 libcli_register_param(&interface, &if_name);
                 {
+                    tcp_ip_traceoptions_cli(0,&if_name);
                     /*config node <node-name> interface <if-name> l2mode*/
                     static param_t l2_mode;
                     init_param(&l2_mode, CMD, "l2mode", 0, 0, INVALID, 0, "\"l2mode\" keyword");
