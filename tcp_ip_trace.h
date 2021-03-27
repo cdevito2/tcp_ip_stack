@@ -54,5 +54,7 @@ void tcp_ip_set_all_log_info_params(log_t *log_info, bool_t status);
 void tcp_ip_show_log_status(node_t *node);
 void tcp_dump_l3_fwding_logger(node_t *node, char *oif_name, char *gw_ip);
 void tcp_init_send_logging_buffer(node_t *node);
+#define TCP_GET_NODE_SEND_LOG_BUFFER(node) \
+    (node->node_nw_prop.send_log_buffer)
 
 #endif

@@ -566,8 +566,11 @@ nw_init_cli(){
                  init_param(&node_name, LEAF, 0, 0, validate_node_extistence, STRING, "node-name", "Node Name");
                  libcli_register_param(&node, &node_name);
                  {
+                     /* show node <node-name> log-status */
                      static param_t log_status;
                      init_param(&log_status,CMD,"log-status",traceoptions_handler,0,INVALID,0,"log-status");
+                     libcli_register_param(&node_name,&log_status);
+                     set_param_cmd_code(&log_status,CMDCODE_DEBUG_SHOW_LOG_STATUS);
                  }
                  {
                     /*show node <node-name> arp*/

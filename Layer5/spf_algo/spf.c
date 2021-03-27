@@ -22,7 +22,7 @@
 
 
 #define INFINITE_METRIC 0xFFFFFFFF
-#define SPF_LOGGING 1
+#define SPF_LOGGING 0
 
 
 extern graph_t *topo;

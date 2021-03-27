@@ -27,6 +27,15 @@ extern graph_t *topo;
 static char tcp_print_recv_buffer[TCP_PRINT_BUFFER_SIZE];
 static char string_buffer[35];
 
+void
+tcp_init_send_logging_buffer(node_t *node){
+
+    memset(TCP_GET_NODE_SEND_LOG_BUFFER(node), 0, TCP_PRINT_BUFFER_SIZE);
+}
+
+static void init_tcp_print_recv_buffer(){
+    memset(tcp_print_recv_buffer,0,sizeof(tcp_print_recv_buffer));
+}
 
 static void init_string_buffer(){
     memset(string_buffer,0,sizeof(string_buffer));
@@ -71,6 +80,7 @@ static char * string_arp_hdr_type(int type){
         default:
             ; 
     }
+    return string_buffer;
 }
 
 
@@ -117,27 +127,48 @@ static int tcp_dump_arp_hdr(char *buff, arp_hdr_t *arp_hdr, uint32_t pkt_size){
     int rc =0;
     char ip1[16];
     char ip2[16];
-
+    
     rc += sprintf(buff, "ARP Hdr : "); //TODO: might be buff + rc if its not working
+
+    printf( "Arp Type:  %02x:%02x:%02x:%02x:%02x:%02x -> "
+            "%02x:%02x:%02x:%02x:%02x:%02x %s -> %s\n",
+            arp_hdr->src_mac.mac[0],
+            arp_hdr->src_mac.mac[1],
+            arp_hdr->src_mac.mac[2],
+            arp_hdr->src_mac.mac[3],
+            arp_hdr->src_mac.mac[4],
+            arp_hdr->src_mac.mac[5],
+
+            arp_hdr->dst_mac.mac[0],
+            arp_hdr->dst_mac.mac[1],
+            arp_hdr->dst_mac.mac[2],
+            arp_hdr->dst_mac.mac[3],
+            arp_hdr->dst_mac.mac[4],
+            arp_hdr->dst_mac.mac[5],
+
+            tcp_ip_convert_ip_n_to_p(arp_hdr->src_ip, ip1),
+            tcp_ip_convert_ip_n_to_p(arp_hdr->dst_ip, ip2));
+    
     rc += sprintf(buff + rc, "Arp Type: %s %02x:%02x:%02x:%02x:%02x:%02x -> "
-           "%02x:%02x:%02x:%02x:%02x:%02x %s -> %s\n",
-           string_arp_hdr_type(arp_hdr->op_code),
-           arp_hdr->src_mac.mac[0],
-           arp_hdr->src_mac.mac[1],
-           arp_hdr->src_mac.mac[2],
-           arp_hdr->src_mac.mac[3],
-           arp_hdr->src_mac.mac[4],
-           arp_hdr->src_mac.mac[5],
+            "%02x:%02x:%02x:%02x:%02x:%02x %s -> %s\n",
+            string_arp_hdr_type(arp_hdr->op_code),
+            arp_hdr->src_mac.mac[0],
+            arp_hdr->src_mac.mac[1],
+            arp_hdr->src_mac.mac[2],
+            arp_hdr->src_mac.mac[3],
+            arp_hdr->src_mac.mac[4],
+            arp_hdr->src_mac.mac[5],
 
-           arp_hdr->dst_mac.mac[0],
-           arp_hdr->dst_mac.mac[1],
-           arp_hdr->dst_mac.mac[2],
-           arp_hdr->dst_mac.mac[3],
-           arp_hdr->dst_mac.mac[4],
-           arp_hdr->dst_mac.mac[5],
+            arp_hdr->dst_mac.mac[0],
+            arp_hdr->dst_mac.mac[1],
+            arp_hdr->dst_mac.mac[2],
+            arp_hdr->dst_mac.mac[3],
+            arp_hdr->dst_mac.mac[4],
+            arp_hdr->dst_mac.mac[5],
 
-           tcp_ip_convert_ip_n_to_p(arp_hdr->src_ip,ip1),
-           tcp_ip_convert_ip_n_to_p(arp_hdr->dst_ip,ip2));
+            tcp_ip_convert_ip_n_to_p(arp_hdr->src_ip, ip1),
+            tcp_ip_convert_ip_n_to_p(arp_hdr->dst_ip, ip2));
+
    return rc;
 
 }
@@ -186,6 +217,7 @@ static int tcp_dump_ethernet_hdr(char *buff, ethernet_hdr_t *eth_hdr, uint32_t p
            payload_size);
 
     //eth hdr can encapsulate ip hdr or arp hdr so check
+    
 
     switch(type){
         case ETH_IP:
@@ -260,7 +292,7 @@ static void tcp_dump(int sock_fd, FILE *log_file1, FILE *log_file2, char *pkt, u
 
 
     int rc =0;
-
+    
     //first check hdr type
     switch(hdr_type){
         case ETH_HDR:
@@ -287,23 +319,95 @@ static void tcp_dump(int sock_fd, FILE *log_file1, FILE *log_file2, char *pkt, u
 void tcp_dump_recv_logger(node_t *node, interface_t *intf, char *pkt, uint32_t pkt_size, hdr_type_t hdr_type){
 
     //step1 : eval condition whether user enabled logging flags through CLIs
+    int rc =0;
+    if(node->log_info.all || node->log_info.recv || intf->log_info.recv){
+        int sock_fd = (topo->gstdout && (node->log_info.is_stdout ||
+                intf->log_info.is_stdout)) ? STDOUT_FILENO: -1;
+
     
 
+        FILE *log_file1 = (node->log_info.all || node->log_info.recv) ?
+            node->log_info.log_file:NULL;
+
+        FILE *log_file2 = (intf->log_info.all || intf->log_info.recv) ?
+            intf->log_info.log_file:NULL;
     //step2 : init logging buffer
-    
+   
+        if(sock_fd == -1 && !log_file1 && !log_file2){
+            return;
+        }
+
+        init_tcp_print_recv_buffer();
+
+        rc = sprintf(tcp_print_recv_buffer, "\n%s(%s) <-- \n",
+            node->node_name,intf->if_name);
 
     //step3 : call tcp_dump
 
+        tcp_dump(sock_fd,log_file1,log_file2,pkt,pkt_size,hdr_type,tcp_print_recv_buffer,
+        rc,TCP_PRINT_BUFFER_SIZE - rc);
+    }
 }
+
+void
+tcp_dump_l3_fwding_logger(node_t *node,
+            char *oif_name, char *gw_ip){
+
+    int rc = 0;
+
+    if(!node->log_info.l3_fwd)
+        return;
+
+    int sock_fd = topo->gstdout && node->log_info.is_stdout ?
+                    STDOUT_FILENO : -1 ;
+    FILE *log_file1 = (node->log_info.all || node->log_info.l3_fwd) ?
+             node->log_info.log_file : NULL;
+     
+    if(sock_fd == -1 && !log_file1)
+        return;
+
+    tcp_init_send_logging_buffer(node);
+    
+    rc = sprintf(TCP_GET_NODE_SEND_LOG_BUFFER(node), 
+            "L3 Fwd : (%s)%s --> %s\n", 
+            node->node_name, oif_name, gw_ip);
+
+    tcp_write_data(sock_fd, log_file1, NULL, 
+        TCP_GET_NODE_SEND_LOG_BUFFER(node), rc); 
+}
+
 void tcp_dump_send_logger(node_t *node, interface_t *intf, char *pkt, uint32_t pkt_size, hdr_type_t hdr_type){
 
     //step1 : eval condition whether user enabled logging flags through CLIs
+    int rc =0;
+    if(node->log_info.all || node->log_info.send || intf->log_info.send){
+        int sock_fd = (topo->gstdout && (node->log_info.is_stdout ||
+                intf->log_info.is_stdout)) ? STDOUT_FILENO: -1;
+
     
 
+        FILE *log_file1 = (node->log_info.all || node->log_info.send) ?
+            node->log_info.log_file:NULL;
+
+        FILE *log_file2 = (intf->log_info.all || intf->log_info.send) ?
+            intf->log_info.log_file:NULL;
     //step2 : init logging buffer
-    
+  
+        if(sock_fd == -1 && !log_file1 && !log_file2){
+            return;
+        }
 
+        tcp_init_send_logging_buffer(node);
+
+        rc = sprintf(TCP_GET_NODE_SEND_LOG_BUFFER(node), "\n%s(%s) <-- \n",
+            node->node_name,intf->if_name);
     //step3 : call tcp_dump
+
+        tcp_dump(sock_fd,log_file1,log_file2,pkt,pkt_size,hdr_type,TCP_GET_NODE_SEND_LOG_BUFFER(node),
+        rc,TCP_PRINT_BUFFER_SIZE - rc);
+    }
+
+    
 }
 
 
@@ -426,10 +530,10 @@ int traceoptions_handler(param_t *param, ser_buff_t *tlv_buf, op_mode enable_or_
         if(strncmp(tlv->leaf_id,"node-name",strlen("node-name")) == 0){
             node_name = tlv->value;
         }
-        else if(strncmp(tlv->leaf_id,"of-name",strlen("if-name")) == 0){
+        else if(strncmp(tlv->leaf_id,"if-name",strlen("if-name")) == 0){
             if_name = tlv->value;
         }
-        else if(strncmp(tlv->leaf_id,"node-name",strlen("node-name")) == 0){
+        else if(strncmp(tlv->leaf_id,"flag-val",strlen("flag-val")) == 0){
             flag_val = tlv->value;
         }
         else{

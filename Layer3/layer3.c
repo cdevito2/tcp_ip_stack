@@ -377,6 +377,7 @@ static void layer3_pkt_receive_from_top(node_t *node, char *pkt, unsigned int si
     inet_pton(AF_INET,nexthop->gw_ip,&next_hop_ip);
     next_hop_ip = htonl(next_hop_ip);
 
+    tcp_dump_l3_fwding_logger(node,nexthop->oif->if_name,nexthop->gw_ip);
     demote_pkt_to_layer2(node,next_hop_ip,nexthop->oif->if_name,shifted_pkt_buffer,new_pkt_size,ETH_IP);
 
     free(new_pkt);
@@ -471,7 +472,7 @@ static void layer3_ip_pkt_recv_from_layer2(node_t *node, interface_t *interface,
     
         inet_pton(AF_INET, nexthop->gw_ip, &next_hop_ip);
         next_hop_ip = htonl(next_hop_ip);
-   
+        tcp_dump_l3_fwding_logger(node,nexthop->oif->if_name,nexthop->gw_ip); 
 
         demote_pkt_to_layer2(node, 
                 next_hop_ip,
