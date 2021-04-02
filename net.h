@@ -182,6 +182,13 @@ static inline void init_intf_nw_prop(intf_nw_props_t *intf_nw_props){
 
 
 
+#define IF_UP_DOWN_CHANGE_F         (0)
+#define IF_IP_ADDR_CHANGE_F         (1)
+#define IF_OPER_MODE_CHANGE_F       (2)
+#define IF_VLAN_MEBERSHIP_CHANGE_F  (3)
+#define IF_METRIC_CHANGE_F          (4)
+
+
 bool_t is_interface_l3_bidirectional(interface_t *interface);
 bool_t is_same_subnet(char *ip_addr, char mask, char *other_ip_addr);
 

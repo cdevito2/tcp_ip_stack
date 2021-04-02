@@ -36,7 +36,10 @@
 #include "CommandParser/cmdtlv.h"
 #include "cmdcodes.h"
 #include "Layer5/app_handlers.h"
+#include "BitOp/bitsop.h"
+#include "tcpip_notif.h"
 #include <stdint.h>
+
 extern graph_t *topo;
 
 extern void tcp_ip_traceoptions_cli(param_t *node_name_param, param_t *intf_name_param);
@@ -497,10 +500,20 @@ intf_config_handler(param_t *param, ser_buff_t *tlv_buf,
             }
         }    
         case CMDCODE_CONF_INTF_UP_DOWN:
-            if(strncmp(if_up_down,"up",strlen("up")) == 0)
+            if(strncmp(if_up_down,"up",strlen("up")) == 0){
+                if(interface->intf_nw_props.is_up == FALSE){
+                    SET_BIT(if_change_flags, IF_UP_DOWN_CHANGE_F);
+                }
                 interface->intf_nw_props.is_up = TRUE;
+            }
             else{
+                if(interface->intf_nw_props.is_up == TRUE){
+                    SET_BIT(if_change_flags,IF_UP_DOWN_CHANGE_F);
+                }
                 interface->intf_nw_props.is_up = FALSE;
+            }
+            if(IS_BIT_SET(if_change_flags,IF_UP_DOWN_CHANGE_F)){
+                nfc_intf_invoke_notification_to_subscribers(interface,0,if_change_flags);
             }
             break;
         case CMDCODE_INTF_CONFIG_L2_MODE:

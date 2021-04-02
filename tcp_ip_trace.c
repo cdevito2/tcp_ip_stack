@@ -129,26 +129,6 @@ static int tcp_dump_arp_hdr(char *buff, arp_hdr_t *arp_hdr, uint32_t pkt_size){
     char ip2[16];
     
     rc += sprintf(buff, "ARP Hdr : "); //TODO: might be buff + rc if its not working
-
-    printf( "Arp Type:  %02x:%02x:%02x:%02x:%02x:%02x -> "
-            "%02x:%02x:%02x:%02x:%02x:%02x %s -> %s\n",
-            arp_hdr->src_mac.mac[0],
-            arp_hdr->src_mac.mac[1],
-            arp_hdr->src_mac.mac[2],
-            arp_hdr->src_mac.mac[3],
-            arp_hdr->src_mac.mac[4],
-            arp_hdr->src_mac.mac[5],
-
-            arp_hdr->dst_mac.mac[0],
-            arp_hdr->dst_mac.mac[1],
-            arp_hdr->dst_mac.mac[2],
-            arp_hdr->dst_mac.mac[3],
-            arp_hdr->dst_mac.mac[4],
-            arp_hdr->dst_mac.mac[5],
-
-            tcp_ip_convert_ip_n_to_p(arp_hdr->src_ip, ip1),
-            tcp_ip_convert_ip_n_to_p(arp_hdr->dst_ip, ip2));
-    
     rc += sprintf(buff + rc, "Arp Type: %s %02x:%02x:%02x:%02x:%02x:%02x -> "
             "%02x:%02x:%02x:%02x:%02x:%02x %s -> %s\n",
             string_arp_hdr_type(arp_hdr->op_code),
