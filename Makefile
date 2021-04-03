@@ -18,7 +18,8 @@ OBJS=gluethread/glthread.o \
 		  tcp_stack_init.o \
 		  tcp_ip_trace.o   \
 		  tcpip_notif.o    \
-		  notif.o
+		  notif.o          \
+		  WheelTimer/WheelTimer.o
 
 pkt_gen.exe:pkt_gen.o utils.o
 	${CC} ${CFLAGS} -I tcp_public.h pkt_gen.o utils.o -o pkt_gen.exe
@@ -83,6 +84,9 @@ notif.o:notif.c
 tcpip_notif.o:tcpip_notif.c
 	${CC} ${CFLAGS} -c -I gluethread -I . tcpip_notif.c -o tcpip_notif.o
 
+WheelTimer/WheelTimer.o:WheelTimer/WheelTimer.c
+	${CC} ${CFLAGS} -c -I gluethread -I WheelTimer WheelTimer/WheelTimer.c -o WheelTimer/WheelTimer.o
+
 CommandParser/libcli.a:
 	(cd CommandParser; make)
 clean:
@@ -93,10 +97,12 @@ clean:
 	rm -f Layer3/*.o
 	rm -f Layer5/*.o
 	rm -f Layer5/spf_algo/*.o
+	rm -f WheelTimer/WheelTimer.o
 all:
 	make
 	(cd CommandParser; make)
 
 cleanall:
 	make clean
+	rm -f WheelTimer/WheelTimer.o
 	(cd CommandParser; make clean)
