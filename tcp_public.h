@@ -37,6 +37,7 @@
 #include "cmdcodes.h"
 #include "Layer5/app_handlers.h"
 #include "tcp_ip_trace.h"
+#include "tcpip_notif.h"
 
 extern graph_t * topo;
 

@@ -16,8 +16,8 @@
  * =====================================================================================
  */
 
-#ifndef __NOTIF_CHAIN__
-#define __NOTIF_CHAIN__
+#ifndef __NOTIF_CHAIN_
+#define __NOTIF_CHAIN_
 
 #include <stddef.h>
 #include "gluethread/glthread.h"
@@ -34,10 +34,10 @@ typedef struct notif_chain_elem{
     char key[MAX_NOTIF_KEY_SIZE];
     size_t key_size;
     bool_t is_key_set;
-    nfc_app_cv app_cb;//callback
+    nfc_app_cb app_cb;//callback
     glthread_t glue;//glue to linkedlist
 
-}notif_chain_elan_t;
+}notif_chain_elem_t;
 GLTHREAD_TO_STRUCT(glthread_glue_to_notif_chain_elem,notif_chain_elem_t,glue);
 
 typedef struct notif_chain_{

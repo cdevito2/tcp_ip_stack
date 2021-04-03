@@ -23,7 +23,6 @@
 #include "net.h"
 #include <assert.h>
 #include <stddef.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include "tcp_ip_trace.h"

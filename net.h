@@ -32,7 +32,6 @@
 
 #define MAX_VLAN_MEMBERSHIP 10
 
-#define IF_METRIC_CHANGE_F          (1 << 3)
 typedef struct graph_ graph_t;
 typedef struct node_ node_t;
 typedef struct interface_ interface_t;

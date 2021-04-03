@@ -551,9 +551,30 @@ static void compute_spf_all_routers(graph_t *topo){
     }ITERATE_GLTHREAD_END(&topo->node_list,curr);
 }
 
+
+static void spf_algo_interface_update(void *arg, size_t arg_size){
+    intf_notif_data_t *intf_notif_data = (intf_notif_data_t *)arg;
+    uint32_t flags = intf_notif_data->change_flags;
+    interface_t *intf = intf_notif_data->interface;
+    intf_nw_props_t *old_intf_nw_props = intf_notif_data->old_intf_nw_props;
+
+    printf("%s() called\n",__FUNCTION__);
+
+    if(IS_BIT_SET(flags,IF_UP_DOWN_CHANGE_F) || IS_BIT_SET(flags,IF_METRIC_CHANGE_F)){
+        goto RUN_SPF;
+    }
+    return;
+RUN_SPF:
+    compute_spf_all_routers(topo);
+}
+
+
+
+
 void init_spf_algo()
 {
     compute_spf_all_routers(topo);
+    nfc_intf_register_for_events(spf_algo_interface_update);
 }
 
 int spf_algo_handler(param_t *param, ser_buff_t *tlv_buf,op_mode enable_or_disable){

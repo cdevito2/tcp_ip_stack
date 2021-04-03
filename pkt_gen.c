@@ -38,7 +38,7 @@
 
 #define SRC_NODE_UDP_PORT_NO 40000
 #define DEST_IP_ADDR "122.1.1.2"
-#define INGRESS_INTF_NAME "eth0/7"
+#define INGRESS_INTF_NAME "eth0"
 
 static char send_buffer[MAX_PACKET_BUFFER_SIZE];
 

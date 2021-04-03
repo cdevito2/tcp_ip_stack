@@ -23,7 +23,7 @@
 
 void nfc_register_notif_chain(notif_chain_t *nfc, notif_chain_elem_t *nfce){
     //create copy of nfc element and insert in notification chain
-    notif_chain_elemt_t *new_nfce = calloc(1,sizeof(notif_chain_elemt_t));
+    notif_chain_elem_t *new_nfce = calloc(1,sizeof(notif_chain_elem_t));
     memcpy(new_nfce,nfce,sizeof(notif_chain_elem_t));
     init_glthread(&new_nfce->glue);
     glthread_add_next(&nfc->notif_chain_head, &new_nfce->glue);

@@ -18,9 +18,8 @@
 
 #include <stdlib.h>
 #include <memory.h>
-#include "net.h"
 #include "tcpip_notif.h"
-
+#include "net.h"
 
 //notif chain for interfaces - config change notification to applications
 static notif_chain_t nfc_intf = {
